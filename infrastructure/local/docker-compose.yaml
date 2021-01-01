@@ -1,0 +1,26 @@
+version: '3.0'
+
+services:
+  roach1:
+    image: cockroachdb/cockroach:latest
+    command: start --insecure --join=roach1,roach2,roach3
+    ports:
+      - 26257:26257
+      - 8080:8080
+    volumes:
+      - roach1:/cockroach/cockroach-data
+  roach2:
+    image: cockroachdb/cockroach:latest
+    command: start --insecure --join=roach1,roach2,roach3
+    volumes:
+      - roach2:/cockroach/cockroach-data
+  roach3:
+    image: cockroachdb/cockroach:latest
+    command: start --insecure --join=roach1,roach2,roach3
+    volumes:
+      - roach3:/cockroach/cockroach-data
+
+volumes:
+  roach1:
+  roach2:
+  roach3:
