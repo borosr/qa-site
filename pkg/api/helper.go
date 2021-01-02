@@ -2,6 +2,7 @@ package api
 
 import (
 	"encoding/json"
+	"io/ioutil"
 	"net/http"
 )
 
@@ -28,4 +29,28 @@ func SuccessResponse(w http.ResponseWriter, v interface{}) {
 
 func InternalServerError(w http.ResponseWriter) {
 	http.Error(w, "internal server error", http.StatusInternalServerError)
+}
+
+func BadRequest(w http.ResponseWriter) {
+	http.Error(w, "bad request", http.StatusBadRequest)
+}
+
+func NotFound(w http.ResponseWriter) {
+	http.Error(w, "not found", http.StatusNotFound)
+}
+
+// Bind unmarshall the http.Request's body to v
+// v should be a pointer
+func Bind(r *http.Request, v interface{}) error {
+	rawBody, err := ioutil.ReadAll(r.Body)
+	if err != nil {
+		return err
+	}
+	defer r.Body.Close()
+
+	if err := json.Unmarshal(rawBody, v); err != nil {
+		return err
+	}
+
+	return err
 }

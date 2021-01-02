@@ -1,10 +1,12 @@
 package api
 
 import (
+	"log"
 	"net/http"
 
 	"github.com/borosr/qa-site/pkg/healthcheck"
 	"github.com/borosr/qa-site/pkg/settings"
+	"github.com/borosr/qa-site/pkg/users"
 	"github.com/go-chi/chi"
 	"github.com/go-chi/chi/middleware"
 )
@@ -18,8 +20,13 @@ func Init() error {
 
 	r.Route("/api", func(r chi.Router) {
 		r.Get("/status", healthcheck.Route)
+
+		r.Post("/users", users.Create)
 		// TODO add other endpoints
 	})
 
-	return http.ListenAndServe(":"+settings.Get().Port, r)
+	config := settings.Get()
+	log.Printf("Running the API on port: %s", config.Port)
+
+	return http.ListenAndServe(":"+config.Port, r)
 }

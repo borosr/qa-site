@@ -1,0 +1,10 @@
+output = "pkg/models"
+
+[crdb]
+dbname = "qa_site"
+host = "localhost"
+port = 26257
+user = "qa_site"
+pass = "qa_site"
+blacklist = ["goose_db_version"]
+sslmode = "require"
