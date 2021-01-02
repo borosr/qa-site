@@ -2,12 +2,12 @@ package users
 
 import (
 	"context"
-	"log"
 	"net/http"
 
 	"github.com/borosr/qa-site/pkg/api"
 	"github.com/borosr/qa-site/pkg/db"
 	"github.com/borosr/qa-site/pkg/models"
+	log "github.com/sirupsen/logrus"
 	"github.com/volatiletech/sqlboiler/v4/queries/qm"
 	"golang.org/x/crypto/bcrypt"
 )
@@ -46,8 +46,8 @@ func validCreateRequest(ctx context.Context, user models.User) bool {
 	valid := user.ID == "" && user.Username != "" &&
 		(user.FullName.Valid && user.FullName.String != "") && (user.Password.Valid && user.Password.String != "")
 
-	if exists, err := models.Users(qm.Where("username=?", user.Username)).Exists(ctx, db.Get()); err != nil || exists  {
-		log.Printf("user with username [%s] already exist", user.Username)
+	if exists, err := models.Users(qm.Where("username=?", user.Username)).Exists(ctx, db.Get()); err != nil || exists {
+		log.Warnf("user with username [%s] already exist", user.Username)
 		return false
 	}
 
