@@ -6,6 +6,7 @@ var config Config
 
 type Config struct {
 	DBConnectionString string `json:"db_connection_string"`
+	Port               string `json:"port"`
 	set                bool   `json:"-"`
 }
 
@@ -35,4 +36,5 @@ func setup() Config {
 
 func setDefaults() {
 	viper.SetDefault("DBConnectionString", "postgres://qa_site:qa_site@localhost:26257/qm_site?sslmode=disable")
+	viper.SetDefault("Port", "8000")
 }

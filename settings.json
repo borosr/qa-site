@@ -1,3 +1,4 @@
 {
-  "DBConnectionString": "postgres://qa_site:qa_site@localhost:26257/qa_site?sslmode=require"
+  "DBConnectionString": "postgres://qa_site:qa_site@localhost:26257/qa_site?sslmode=require",
+  "Port": "8000"
 }
