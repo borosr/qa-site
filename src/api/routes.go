@@ -25,7 +25,12 @@ func Init() error {
 
 		r.Post("/users", users.Create)
 		r.Post("/login", auth.DefaultLogin)
-		// TODO add other endpoints
+
+		loggedIn := r.With(auth.Middleware)
+		loggedIn.Get("/users", users.GetAll)
+		loggedIn.Get("/users/{id}", users.Get)
+		loggedIn.Delete("/users/{id}", users.Delete)
+		loggedIn.Put("/users/{id}", users.Update)
 	})
 
 	config := settings.Get()
