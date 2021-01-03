@@ -2,6 +2,7 @@ package auth
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"net/http"
 	"time"
@@ -19,6 +20,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/volatiletech/null/v8"
 	"github.com/volatiletech/sqlboiler/v4/boil"
+	"github.com/volatiletech/sqlboiler/v4/queries/qm"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -223,19 +225,35 @@ func SocialMediaCallback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user := models.User{
-		ID:          xid.New().String(),
-		Username:    callbackResp.UserDetails.Username(),
-		FullName:    null.StringFrom(callbackResp.UserDetails.FullName()),
-		AccessToken: null.StringFrom(callbackResp.Response.AccessToken),
-	}
-	if err := user.Insert(ctx, db.Get(), boil.Infer()); err != nil {
+	user, err := models.Users(qm.Where("username=?", callbackResp.UserDetails.Username())).One(ctx, db.Get())
+	if errors.Is(err, sql.ErrNoRows) {
+		user = &models.User{
+			ID:          xid.New().String(),
+			Username:    callbackResp.UserDetails.Username(),
+			FullName:    null.StringFrom(callbackResp.UserDetails.FullName()),
+			AccessToken: null.StringFrom(callbackResp.Response.AccessToken),
+		}
+		if err := user.Insert(ctx, db.Get(), boil.Infer()); err != nil {
+			api.InternalServerError(w)
+
+			return
+		}
+	} else if err != nil {
+		log.Error(err)
 		api.InternalServerError(w)
 
 		return
+	} else {
+		user.AccessToken.SetValid(callbackResp.Response.AccessToken)
+		if _, err := user.Update(ctx, db.Get(), boil.Infer()); err != nil {
+			log.Error(err)
+			api.InternalServerError(w)
+
+			return
+		}
 	}
 
-	resp, err := loggingIn(ctx, user, time.Now())
+	resp, err := loggingIn(ctx, *user, time.Now())
 	if err != nil {
 		log.Error(err)
 		api.Forbidden(w)
@@ -274,4 +292,25 @@ func loggingIn(ctx context.Context, user models.User, now time.Time) (Response, 
 		RevokeToken: revokeToken,
 		AuthKind:    DefaultAuthKind,
 	}, nil
+}
+
+func Logout(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	loggedInUser := r.Context().Value("user").(models.User)
+
+	if _, err := models.RevokeTokens(qm.Where("owner_id=?", loggedInUser.ID)).DeleteAll(ctx, db.Get()); err != nil {
+		log.Error(err)
+		api.InternalServerError(w)
+
+		return
+	}
+
+	if _, err := models.Users(qm.Where("id=?", loggedInUser.ID)).DeleteAll(ctx, db.Get()); err != nil {
+		log.Error(err)
+		api.InternalServerError(w)
+
+		return
+	}
+
+	api.SuccessResponse(w, struct{ Msg string }{Msg: "Logout success"})
 }

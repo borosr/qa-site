@@ -27,6 +27,7 @@ func Init() error {
 		r.Post("/login", auth.DefaultLogin)
 		r.Get("/login/{media:(github)}", auth.SocialMediaRedirect)
 		r.Get("/login/{media:(github)}/callback", auth.SocialMediaCallback)
+		r.Delete("/logout", auth.Logout)
 
 		loggedIn := r.With(auth.Middleware)
 		loggedIn.Get("/users", users.GetAll)
