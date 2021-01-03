@@ -24,54 +24,62 @@ import (
 
 // User is an object representing the database table.
 type User struct {
-	ID       string      `boil:"id" json:"id" toml:"id" yaml:"id"`
-	Username string      `boil:"username" json:"username" toml:"username" yaml:"username"`
-	Password null.String `boil:"password" json:"password,omitempty" toml:"password" yaml:"password,omitempty"`
-	FullName null.String `boil:"full_name" json:"full_name,omitempty" toml:"full_name" yaml:"full_name,omitempty"`
+	ID          string      `boil:"id" json:"id" toml:"id" yaml:"id"`
+	Username    string      `boil:"username" json:"username" toml:"username" yaml:"username"`
+	Password    null.String `boil:"password" json:"password,omitempty" toml:"password" yaml:"password,omitempty"`
+	FullName    null.String `boil:"full_name" json:"full_name,omitempty" toml:"full_name" yaml:"full_name,omitempty"`
+	AccessToken null.String `boil:"access_token" json:"access_token,omitempty" toml:"access_token" yaml:"access_token,omitempty"`
 
 	R *userR `boil:"-" json:"-" toml:"-" yaml:"-"`
 	L userL  `boil:"-" json:"-" toml:"-" yaml:"-"`
 }
 
 var UserColumns = struct {
-	ID       string
-	Username string
-	Password string
-	FullName string
+	ID          string
+	Username    string
+	Password    string
+	FullName    string
+	AccessToken string
 }{
-	ID:       "id",
-	Username: "username",
-	Password: "password",
-	FullName: "full_name",
+	ID:          "id",
+	Username:    "username",
+	Password:    "password",
+	FullName:    "full_name",
+	AccessToken: "access_token",
 }
 
 // Generated where
 
 var UserWhere = struct {
-	ID       whereHelperstring
-	Username whereHelperstring
-	Password whereHelpernull_String
-	FullName whereHelpernull_String
+	ID          whereHelperstring
+	Username    whereHelperstring
+	Password    whereHelpernull_String
+	FullName    whereHelpernull_String
+	AccessToken whereHelpernull_String
 }{
-	ID:       whereHelperstring{field: "\"users\".\"id\""},
-	Username: whereHelperstring{field: "\"users\".\"username\""},
-	Password: whereHelpernull_String{field: "\"users\".\"password\""},
-	FullName: whereHelpernull_String{field: "\"users\".\"full_name\""},
+	ID:          whereHelperstring{field: "\"users\".\"id\""},
+	Username:    whereHelperstring{field: "\"users\".\"username\""},
+	Password:    whereHelpernull_String{field: "\"users\".\"password\""},
+	FullName:    whereHelpernull_String{field: "\"users\".\"full_name\""},
+	AccessToken: whereHelpernull_String{field: "\"users\".\"access_token\""},
 }
 
 // UserRels is where relationship names are stored.
 var UserRels = struct {
 	CreatedByAnswers   string
 	CreatedByQuestions string
+	OwnerRevokeTokens  string
 }{
 	CreatedByAnswers:   "CreatedByAnswers",
 	CreatedByQuestions: "CreatedByQuestions",
+	OwnerRevokeTokens:  "OwnerRevokeTokens",
 }
 
 // userR is where relationships are stored.
 type userR struct {
-	CreatedByAnswers   AnswerSlice   `boil:"CreatedByAnswers" json:"CreatedByAnswers" toml:"CreatedByAnswers" yaml:"CreatedByAnswers"`
-	CreatedByQuestions QuestionSlice `boil:"CreatedByQuestions" json:"CreatedByQuestions" toml:"CreatedByQuestions" yaml:"CreatedByQuestions"`
+	CreatedByAnswers   AnswerSlice      `boil:"CreatedByAnswers" json:"CreatedByAnswers" toml:"CreatedByAnswers" yaml:"CreatedByAnswers"`
+	CreatedByQuestions QuestionSlice    `boil:"CreatedByQuestions" json:"CreatedByQuestions" toml:"CreatedByQuestions" yaml:"CreatedByQuestions"`
+	OwnerRevokeTokens  RevokeTokenSlice `boil:"OwnerRevokeTokens" json:"OwnerRevokeTokens" toml:"OwnerRevokeTokens" yaml:"OwnerRevokeTokens"`
 }
 
 // NewStruct creates a new relationship struct
@@ -83,9 +91,9 @@ func (*userR) NewStruct() *userR {
 type userL struct{}
 
 var (
-	userAllColumns            = []string{"id", "username", "password", "full_name"}
+	userAllColumns            = []string{"id", "username", "password", "full_name", "access_token"}
 	userColumnsWithoutDefault = []string{"id", "username"}
-	userColumnsWithDefault    = []string{"password", "full_name"}
+	userColumnsWithDefault    = []string{"password", "full_name", "access_token"}
 	userPrimaryKeyColumns     = []string{"id"}
 )
 
@@ -406,6 +414,27 @@ func (o *User) CreatedByQuestions(mods ...qm.QueryMod) questionQuery {
 	return query
 }
 
+// OwnerRevokeTokens retrieves all the revoke_token's RevokeTokens with an executor via owner_id column.
+func (o *User) OwnerRevokeTokens(mods ...qm.QueryMod) revokeTokenQuery {
+	var queryMods []qm.QueryMod
+	if len(mods) != 0 {
+		queryMods = append(queryMods, mods...)
+	}
+
+	queryMods = append(queryMods,
+		qm.Where("\"revoke_tokens\".\"owner_id\"=?", o.ID),
+	)
+
+	query := RevokeTokens(queryMods...)
+	queries.SetFrom(query.Query, "\"revoke_tokens\"")
+
+	if len(queries.GetSelect(query.Query)) == 0 {
+		queries.SetSelect(query.Query, []string{"\"revoke_tokens\".*"})
+	}
+
+	return query
+}
+
 // LoadCreatedByAnswers allows an eager lookup of values, cached into the
 // loaded structs of the objects. This is for a 1-M or N-M relationship.
 func (userL) LoadCreatedByAnswers(ctx context.Context, e boil.ContextExecutor, singular bool, maybeUser interface{}, mods queries.Applicator) error {
@@ -602,6 +631,104 @@ func (userL) LoadCreatedByQuestions(ctx context.Context, e boil.ContextExecutor,
 	return nil
 }
 
+// LoadOwnerRevokeTokens allows an eager lookup of values, cached into the
+// loaded structs of the objects. This is for a 1-M or N-M relationship.
+func (userL) LoadOwnerRevokeTokens(ctx context.Context, e boil.ContextExecutor, singular bool, maybeUser interface{}, mods queries.Applicator) error {
+	var slice []*User
+	var object *User
+
+	if singular {
+		object = maybeUser.(*User)
+	} else {
+		slice = *maybeUser.(*[]*User)
+	}
+
+	args := make([]interface{}, 0, 1)
+	if singular {
+		if object.R == nil {
+			object.R = &userR{}
+		}
+		args = append(args, object.ID)
+	} else {
+	Outer:
+		for _, obj := range slice {
+			if obj.R == nil {
+				obj.R = &userR{}
+			}
+
+			for _, a := range args {
+				if a == obj.ID {
+					continue Outer
+				}
+			}
+
+			args = append(args, obj.ID)
+		}
+	}
+
+	if len(args) == 0 {
+		return nil
+	}
+
+	query := NewQuery(
+		qm.From(`revoke_tokens`),
+		qm.WhereIn(`revoke_tokens.owner_id in ?`, args...),
+	)
+	if mods != nil {
+		mods.Apply(query)
+	}
+
+	results, err := query.QueryContext(ctx, e)
+	if err != nil {
+		return errors.Wrap(err, "failed to eager load revoke_tokens")
+	}
+
+	var resultSlice []*RevokeToken
+	if err = queries.Bind(results, &resultSlice); err != nil {
+		return errors.Wrap(err, "failed to bind eager loaded slice revoke_tokens")
+	}
+
+	if err = results.Close(); err != nil {
+		return errors.Wrap(err, "failed to close results in eager load on revoke_tokens")
+	}
+	if err = results.Err(); err != nil {
+		return errors.Wrap(err, "error occurred during iteration of eager loaded relations for revoke_tokens")
+	}
+
+	if len(revokeTokenAfterSelectHooks) != 0 {
+		for _, obj := range resultSlice {
+			if err := obj.doAfterSelectHooks(ctx, e); err != nil {
+				return err
+			}
+		}
+	}
+	if singular {
+		object.R.OwnerRevokeTokens = resultSlice
+		for _, foreign := range resultSlice {
+			if foreign.R == nil {
+				foreign.R = &revokeTokenR{}
+			}
+			foreign.R.Owner = object
+		}
+		return nil
+	}
+
+	for _, foreign := range resultSlice {
+		for _, local := range slice {
+			if local.ID == foreign.OwnerID {
+				local.R.OwnerRevokeTokens = append(local.R.OwnerRevokeTokens, foreign)
+				if foreign.R == nil {
+					foreign.R = &revokeTokenR{}
+				}
+				foreign.R.Owner = local
+				break
+			}
+		}
+	}
+
+	return nil
+}
+
 // AddCreatedByAnswers adds the given related objects to the existing relationships
 // of the user, optionally inserting them as new records.
 // Appends related to o.R.CreatedByAnswers.
@@ -703,6 +830,59 @@ func (o *User) AddCreatedByQuestions(ctx context.Context, exec boil.ContextExecu
 			}
 		} else {
 			rel.R.CreatedByUser = o
+		}
+	}
+	return nil
+}
+
+// AddOwnerRevokeTokens adds the given related objects to the existing relationships
+// of the user, optionally inserting them as new records.
+// Appends related to o.R.OwnerRevokeTokens.
+// Sets related.R.Owner appropriately.
+func (o *User) AddOwnerRevokeTokens(ctx context.Context, exec boil.ContextExecutor, insert bool, related ...*RevokeToken) error {
+	var err error
+	for _, rel := range related {
+		if insert {
+			rel.OwnerID = o.ID
+			if err = rel.Insert(ctx, exec, boil.Infer()); err != nil {
+				return errors.Wrap(err, "failed to insert into foreign table")
+			}
+		} else {
+			updateQuery := fmt.Sprintf(
+				"UPDATE \"revoke_tokens\" SET %s WHERE %s",
+				strmangle.SetParamNames("\"", "\"", 1, []string{"owner_id"}),
+				strmangle.WhereClause("\"", "\"", 2, revokeTokenPrimaryKeyColumns),
+			)
+			values := []interface{}{o.ID, rel.ID}
+
+			if boil.IsDebug(ctx) {
+				writer := boil.DebugWriterFrom(ctx)
+				fmt.Fprintln(writer, updateQuery)
+				fmt.Fprintln(writer, values)
+			}
+			if _, err = exec.ExecContext(ctx, updateQuery, values...); err != nil {
+				return errors.Wrap(err, "failed to update foreign table")
+			}
+
+			rel.OwnerID = o.ID
+		}
+	}
+
+	if o.R == nil {
+		o.R = &userR{
+			OwnerRevokeTokens: related,
+		}
+	} else {
+		o.R.OwnerRevokeTokens = append(o.R.OwnerRevokeTokens, related...)
+	}
+
+	for _, rel := range related {
+		if rel.R == nil {
+			rel.R = &revokeTokenR{
+				Owner: o,
+			}
+		} else {
+			rel.R.Owner = o
 		}
 	}
 	return nil

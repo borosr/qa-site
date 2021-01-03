@@ -3,6 +3,7 @@ package api
 import (
 	"net/http"
 
+	"github.com/borosr/qa-site/pkg/auth"
 	"github.com/borosr/qa-site/pkg/healthcheck"
 	"github.com/borosr/qa-site/pkg/settings"
 	"github.com/borosr/qa-site/pkg/users"
@@ -23,7 +24,18 @@ func Init() error {
 		r.Get("/status", healthcheck.Route)
 
 		r.Post("/users", users.Create)
-		// TODO add other endpoints
+		r.Post("/login", auth.DefaultLogin)
+		r.Get("/login/{media:(github)}", auth.SocialMediaRedirect)
+		r.Get("/login/{media:(github)}/callback", auth.SocialMediaCallback)
+
+		loggedIn := r.With(auth.Middleware)
+		loggedIn.Get("/users", users.GetAll)
+		loggedIn.Get("/users/{id}", users.Get)
+		loggedIn.Put("/users/{id}", users.Update)
+		loggedIn.Delete("/users/{id}", users.Delete)
+
+		loggedIn.Delete("/logout", auth.Logout)
+		loggedIn.Post("/revoke", auth.Revoke)
 	})
 
 	config := settings.Get()

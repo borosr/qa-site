@@ -4,11 +4,13 @@
 package models
 
 var TableNames = struct {
-	Answers   string
-	Questions string
-	Users     string
+	Answers      string
+	Questions    string
+	RevokeTokens string
+	Users        string
 }{
-	Answers:   "answers",
-	Questions: "questions",
-	Users:     "users",
+	Answers:      "answers",
+	Questions:    "questions",
+	RevokeTokens: "revoke_tokens",
+	Users:        "users",
 }

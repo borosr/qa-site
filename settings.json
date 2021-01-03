@@ -1,4 +1,9 @@
 {
   "DBConnectionString": "postgres://qa_site:qa_site@localhost:26257/qa_site?sslmode=require",
-  "Port": "8000"
+  "Port": "8000",
+  "JwtHMAC": "23000a94ed3962a325a7f707545812960c6d39e46f5aa00ca801e3e97bdebc14",
+  "JwtSecret": "randomString",
+  "RevokeHMAC": "d4e25dba5331071ed574cd337501ba934316cb4d475dc5f99407d3a0b97cdd42",
+  "RevokeSecret": "otherRandomString",
+  "Hostname": "localhost"
 }
