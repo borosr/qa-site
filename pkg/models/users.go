@@ -24,39 +24,44 @@ import (
 
 // User is an object representing the database table.
 type User struct {
-	ID       string      `boil:"id" json:"id" toml:"id" yaml:"id"`
-	Username string      `boil:"username" json:"username" toml:"username" yaml:"username"`
-	Password null.String `boil:"password" json:"password,omitempty" toml:"password" yaml:"password,omitempty"`
-	FullName null.String `boil:"full_name" json:"full_name,omitempty" toml:"full_name" yaml:"full_name,omitempty"`
+	ID          string      `boil:"id" json:"id" toml:"id" yaml:"id"`
+	Username    string      `boil:"username" json:"username" toml:"username" yaml:"username"`
+	Password    null.String `boil:"password" json:"password,omitempty" toml:"password" yaml:"password,omitempty"`
+	FullName    null.String `boil:"full_name" json:"full_name,omitempty" toml:"full_name" yaml:"full_name,omitempty"`
+	AccessToken null.String `boil:"access_token" json:"access_token,omitempty" toml:"access_token" yaml:"access_token,omitempty"`
 
 	R *userR `boil:"-" json:"-" toml:"-" yaml:"-"`
 	L userL  `boil:"-" json:"-" toml:"-" yaml:"-"`
 }
 
 var UserColumns = struct {
-	ID       string
-	Username string
-	Password string
-	FullName string
+	ID          string
+	Username    string
+	Password    string
+	FullName    string
+	AccessToken string
 }{
-	ID:       "id",
-	Username: "username",
-	Password: "password",
-	FullName: "full_name",
+	ID:          "id",
+	Username:    "username",
+	Password:    "password",
+	FullName:    "full_name",
+	AccessToken: "access_token",
 }
 
 // Generated where
 
 var UserWhere = struct {
-	ID       whereHelperstring
-	Username whereHelperstring
-	Password whereHelpernull_String
-	FullName whereHelpernull_String
+	ID          whereHelperstring
+	Username    whereHelperstring
+	Password    whereHelpernull_String
+	FullName    whereHelpernull_String
+	AccessToken whereHelpernull_String
 }{
-	ID:       whereHelperstring{field: "\"users\".\"id\""},
-	Username: whereHelperstring{field: "\"users\".\"username\""},
-	Password: whereHelpernull_String{field: "\"users\".\"password\""},
-	FullName: whereHelpernull_String{field: "\"users\".\"full_name\""},
+	ID:          whereHelperstring{field: "\"users\".\"id\""},
+	Username:    whereHelperstring{field: "\"users\".\"username\""},
+	Password:    whereHelpernull_String{field: "\"users\".\"password\""},
+	FullName:    whereHelpernull_String{field: "\"users\".\"full_name\""},
+	AccessToken: whereHelpernull_String{field: "\"users\".\"access_token\""},
 }
 
 // UserRels is where relationship names are stored.
@@ -86,9 +91,9 @@ func (*userR) NewStruct() *userR {
 type userL struct{}
 
 var (
-	userAllColumns            = []string{"id", "username", "password", "full_name"}
+	userAllColumns            = []string{"id", "username", "password", "full_name", "access_token"}
 	userColumnsWithoutDefault = []string{"id", "username"}
-	userColumnsWithDefault    = []string{"password", "full_name"}
+	userColumnsWithDefault    = []string{"password", "full_name", "access_token"}
 	userPrimaryKeyColumns     = []string{"id"}
 )
 

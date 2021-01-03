@@ -7,13 +7,18 @@ import (
 	"time"
 
 	"github.com/borosr/qa-site/pkg/api"
+	"github.com/borosr/qa-site/pkg/auth/oauth"
 	"github.com/borosr/qa-site/pkg/db"
 	"github.com/borosr/qa-site/pkg/models"
 	"github.com/borosr/qa-site/pkg/settings"
 	"github.com/borosr/qa-site/pkg/users"
 	"github.com/dgrijalva/jwt-go"
 	"github.com/friendsofgo/errors"
+	"github.com/go-chi/chi"
+	"github.com/rs/xid"
 	log "github.com/sirupsen/logrus"
+	"github.com/volatiletech/null/v8"
+	"github.com/volatiletech/sqlboiler/v4/boil"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -54,6 +59,13 @@ func DefaultLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if !user.Password.Valid && user.AccessToken.Valid {
+		log.Errorf("invalid authentication type for user [%s]", req.Username)
+		api.BadRequest(w)
+
+		return
+	}
+
 	if err := bcrypt.CompareHashAndPassword([]byte(user.Password.String), []byte(req.Password)); err != nil {
 		log.Error(err)
 		api.Forbidden(w)
@@ -63,7 +75,7 @@ func DefaultLogin(w http.ResponseWriter, r *http.Request) {
 
 	now := time.Now()
 
-	token, err := generateAuthToken(user, now)
+	resp, err := loggingIn(ctx, user, now)
 	if err != nil {
 		log.Error(err)
 		api.Forbidden(w)
@@ -71,34 +83,7 @@ func DefaultLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	tokenCache[user.ID] = append(tokenCache[user.ID], TokenCache{
-		Token: token,
-		Expr:  now.Add(jwtTimeout),
-	})
-
-	var revokeToken string
-	if revokeToken = GetRevokeToken(ctx, user.ID); revokeToken == "" {
-		var err error
-		revokeToken, err = generateRevokeToken(user, now)
-		if err != nil {
-			log.Error(err)
-			api.Forbidden(w)
-
-			return
-		}
-		if err := StoreRevokeToken(ctx, user.ID, revokeToken); err != nil {
-			log.Error(err)
-			api.Forbidden(w)
-
-			return
-		}
-	}
-
-	api.SuccessResponse(w, Response{
-		Token:       token,
-		RevokeToken: revokeToken,
-		AuthKind:    DefaultAuthKind,
-	})
+	api.SuccessResponse(w, resp)
 }
 
 func generateAuthToken(user models.User, now time.Time) (string, error) {
@@ -158,7 +143,7 @@ func Middleware(next http.Handler) http.Handler {
 			}
 
 			if claims, ok := token.Claims.(jwt.MapClaims); ok && token.Valid {
-				ctx, err = chainTokenBySID(w, claims, jwtToken, ctx)
+				ctx, err = chainTokenBySID(ctx, claims, jwtToken)
 				if err != nil {
 					api.Forbidden(w)
 
@@ -175,16 +160,16 @@ func Middleware(next http.Handler) http.Handler {
 		})
 }
 
-func chainTokenBySID(w http.ResponseWriter, claims jwt.MapClaims, jwtToken string, ctx context.Context) (context.Context, error) {
+func chainTokenBySID(ctx context.Context, claims jwt.MapClaims, jwtToken string) (context.Context, error) {
 	if sid, ok := claims["sid"].(string); ok {
-		return chainTokenCacheCheck(w, sid, jwtToken, ctx)
+		return chainTokenCacheCheck(ctx, sid, jwtToken)
 	} else {
 		log.Errorf("missing sid from claim [%+v]", claims)
 		return ctx, ErrForbidden
 	}
 }
 
-func chainTokenCacheCheck(w http.ResponseWriter, sid string, jwtToken string, ctx context.Context) (context.Context, error) {
+func chainTokenCacheCheck(ctx context.Context, sid string, jwtToken string) (context.Context, error) {
 	if tokens, ok := tokenCache[sid]; ok {
 		now := time.Now()
 		var found bool
@@ -216,4 +201,77 @@ func chainGetUserIfFound(ctx context.Context, sid string) (context.Context, bool
 	}
 
 	return ctx, found
+}
+
+func SocialMediaRedirect(w http.ResponseWriter, r *http.Request) {
+	provider := chi.URLParam(r, "media")
+
+	if err := oauth.Redirect(w, r, provider); err != nil {
+		api.InternalServerError(w)
+	}
+}
+
+func SocialMediaCallback(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	provider := chi.URLParam(r, "media")
+
+	callbackResp, err := oauth.Callback(w, r, provider)
+	if err != nil {
+		log.Error(err)
+		api.InternalServerError(w)
+
+		return
+	}
+
+	user := models.User{
+		ID:          xid.New().String(),
+		Username:    callbackResp.UserDetails.Username(),
+		FullName:    null.StringFrom(callbackResp.UserDetails.FullName()),
+		AccessToken: null.StringFrom(callbackResp.Response.AccessToken),
+	}
+	if err := user.Insert(ctx, db.Get(), boil.Infer()); err != nil {
+		api.InternalServerError(w)
+
+		return
+	}
+
+	resp, err := loggingIn(ctx, user, time.Now())
+	if err != nil {
+		log.Error(err)
+		api.Forbidden(w)
+
+		return
+	}
+
+	api.SuccessResponse(w, resp)
+}
+
+func loggingIn(ctx context.Context, user models.User, now time.Time) (Response, error) {
+	token, err := generateAuthToken(user, now)
+	if err != nil {
+		return Response{}, err
+	}
+
+	tokenCache[user.ID] = append(tokenCache[user.ID], TokenCache{
+		Token: token,
+		Expr:  now.Add(jwtTimeout),
+	})
+
+	var revokeToken string
+	if revokeToken = GetRevokeToken(ctx, user.ID); revokeToken == "" {
+		var err error
+		revokeToken, err = generateRevokeToken(user, now)
+		if err != nil {
+			return Response{}, err
+		}
+		if err := StoreRevokeToken(ctx, user.ID, revokeToken); err != nil {
+			return Response{}, err
+		}
+	}
+
+	return Response{
+		Token:       token,
+		RevokeToken: revokeToken,
+		AuthKind:    DefaultAuthKind,
+	}, nil
 }
