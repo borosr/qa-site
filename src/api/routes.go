@@ -5,6 +5,7 @@ import (
 
 	"github.com/borosr/qa-site/pkg/auth"
 	"github.com/borosr/qa-site/pkg/healthcheck"
+	"github.com/borosr/qa-site/pkg/questions"
 	"github.com/borosr/qa-site/pkg/settings"
 	"github.com/borosr/qa-site/pkg/users"
 	"github.com/chi-middleware/logrus-logger"
@@ -33,6 +34,12 @@ func Init() error {
 		loggedIn.Get("/users/{id}", users.Get)
 		loggedIn.Put("/users/{id}", users.Update)
 		loggedIn.Delete("/users/{id}", users.Delete)
+
+		loggedIn.Get("/questions", questions.GetAll)
+		loggedIn.Get("/questions/{id}", questions.Get)
+		loggedIn.Delete("/questions/{id}", questions.Delete)
+		loggedIn.Post("/questions", questions.Create)
+		loggedIn.Put("/questions/{id}", questions.Update)
 
 		loggedIn.Delete("/logout", auth.Logout)
 		loggedIn.Post("/revoke", auth.Revoke)
