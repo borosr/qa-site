@@ -27,13 +27,14 @@ func Init() error {
 		r.Post("/login", auth.DefaultLogin)
 		r.Get("/login/{media:(github)}", auth.SocialMediaRedirect)
 		r.Get("/login/{media:(github)}/callback", auth.SocialMediaCallback)
-		r.Delete("/logout", auth.Logout)
 
 		loggedIn := r.With(auth.Middleware)
 		loggedIn.Get("/users", users.GetAll)
 		loggedIn.Get("/users/{id}", users.Get)
 		loggedIn.Put("/users/{id}", users.Update)
 		loggedIn.Delete("/users/{id}", users.Delete)
+
+		loggedIn.Delete("/logout", auth.Logout)
 	})
 
 	config := settings.Get()

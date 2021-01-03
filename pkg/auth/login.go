@@ -295,22 +295,33 @@ func loggingIn(ctx context.Context, user models.User, now time.Time) (Response, 
 }
 
 func Logout(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
 	loggedInUser := r.Context().Value("user").(models.User)
 
-	if _, err := models.RevokeTokens(qm.Where("owner_id=?", loggedInUser.ID)).DeleteAll(ctx, db.Get()); err != nil {
-		log.Error(err)
+	var jwtToken string
+	if jwtToken = r.Header.Get(AuthorizationHeader); jwtToken == "" {
 		api.InternalServerError(w)
 
 		return
 	}
 
-	if _, err := models.Users(qm.Where("id=?", loggedInUser.ID)).DeleteAll(ctx, db.Get()); err != nil {
-		log.Error(err)
-		api.InternalServerError(w)
+	var tokenIndex = -1
+	for i, cache := range tokenCache[loggedInUser.ID] {
+		if cache.Token == jwtToken {
+			tokenIndex = i
+
+			break
+		}
+	}
+
+	if tokenIndex == -1 {
+		log.Errorf("invalid access token [%s]", jwtToken)
+		api.BadRequest(w)
 
 		return
 	}
+
+	tokenCache[loggedInUser.ID][tokenIndex] = tokenCache[loggedInUser.ID][len(tokenCache[loggedInUser.ID])-1]
+	tokenCache[loggedInUser.ID] = tokenCache[loggedInUser.ID][:len(tokenCache[loggedInUser.ID])-1]
 
 	api.SuccessResponse(w, struct{ Msg string }{Msg: "Logout success"})
 }
