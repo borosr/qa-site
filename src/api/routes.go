@@ -35,6 +35,7 @@ func Init() error {
 		loggedIn.Delete("/users/{id}", users.Delete)
 
 		loggedIn.Delete("/logout", auth.Logout)
+		loggedIn.Post("/revoke", auth.Revoke)
 	})
 
 	config := settings.Get()
