@@ -3,6 +3,7 @@ package api
 import (
 	"net/http"
 
+	"github.com/borosr/qa-site/pkg/auth"
 	"github.com/borosr/qa-site/pkg/healthcheck"
 	"github.com/borosr/qa-site/pkg/settings"
 	"github.com/borosr/qa-site/pkg/users"
@@ -23,6 +24,7 @@ func Init() error {
 		r.Get("/status", healthcheck.Route)
 
 		r.Post("/users", users.Create)
+		r.Post("/login", auth.DefaultLogin)
 		// TODO add other endpoints
 	})
 

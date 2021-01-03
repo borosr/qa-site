@@ -39,6 +39,10 @@ func NotFound(w http.ResponseWriter) {
 	http.Error(w, "not found", http.StatusNotFound)
 }
 
+func Forbidden(w http.ResponseWriter) {
+	http.Error(w, "forbidden", http.StatusForbidden)
+}
+
 // Bind unmarshall the http.Request's body to v
 // v should be a pointer
 func Bind(r *http.Request, v interface{}) error {

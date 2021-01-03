@@ -1,10 +1,10 @@
 package db
 
 import (
-	_ "github.com/borosr/qa-site/pkg/db/migartions"
+	_ "github.com/borosr/qa-site/pkg/db/migartion"
 	"github.com/pressly/goose"
 )
 
 func Migrate() error {
-	return goose.Up(Get(), "pkg/db/migartions")
+	return goose.Up(Get(), "pkg/db/migartion")
 }

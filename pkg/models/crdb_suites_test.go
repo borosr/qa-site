@@ -8,5 +8,6 @@ import "testing"
 func TestUpsert(t *testing.T) {
 	t.Run("Answers", testAnswersUpsert)
 	t.Run("Questions", testQuestionsUpsert)
+	t.Run("RevokeTokens", testRevokeTokensUpsert)
 	t.Run("Users", testUsersUpsert)
 }

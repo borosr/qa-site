@@ -7,6 +7,10 @@ var config Config
 type Config struct {
 	DBConnectionString string `json:"db_connection_string"`
 	Port               string `json:"port"`
+	JwtHMAC            string `json:"jwt_hmac"`
+	JwtSecret          string `json:"jwt_secret"`
+	RevokeHMAC         string `json:"revoke_hmac"`
+	RevokeSecret       string `json:"revoke_secret"`
 	set                bool   `json:"-"`
 }
 
