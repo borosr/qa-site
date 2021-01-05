@@ -14,6 +14,7 @@ type Config struct {
 	RevokeHMAC         string `json:"revoke_hmac"`
 	RevokeSecret       string `json:"revoke_secret"`
 	Hostname           string `json:"hostname"`
+	BadgerPath         string `json:"badger_path"`
 
 	GithubClientID     string `json:"github_client_id"`
 	GithubClientSecret string `json:"github_client_secret"`
@@ -49,4 +50,5 @@ func setDefaults() {
 	viper.SetDefault("Port", "8000")
 	viper.SetDefault("GithubClientID", "")
 	viper.SetDefault("GithubClientSecret", "")
+	viper.SetDefault("BadgerPath", "/tmp/badger")
 }

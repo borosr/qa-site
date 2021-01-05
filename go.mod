@@ -4,6 +4,7 @@ go 1.15
 
 require (
 	github.com/chi-middleware/logrus-logger v0.1.0
+	github.com/dgraph-io/badger/v2 v2.2007.2
 	github.com/dgrijalva/jwt-go v3.2.0+incompatible
 	github.com/friendsofgo/errors v0.9.2
 	github.com/glerchundi/sqlboiler-crdb/v4 v4.0.0-20201119171748-b99619cae813 // indirect
