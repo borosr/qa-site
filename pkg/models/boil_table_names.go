@@ -6,11 +6,13 @@ package models
 var TableNames = struct {
 	Answers      string
 	Questions    string
+	Ratings      string
 	RevokeTokens string
 	Users        string
 }{
 	Answers:      "answers",
 	Questions:    "questions",
+	Ratings:      "ratings",
 	RevokeTokens: "revoke_tokens",
 	Users:        "users",
 }
