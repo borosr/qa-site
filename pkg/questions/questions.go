@@ -2,12 +2,14 @@ package questions
 
 import (
 	"database/sql"
+	"fmt"
 	"net/http"
 	"strconv"
 
 	"github.com/borosr/qa-site/pkg/api"
 	"github.com/borosr/qa-site/pkg/db"
 	"github.com/borosr/qa-site/pkg/models"
+	"github.com/borosr/qa-site/pkg/ratings"
 	"github.com/friendsofgo/errors"
 	"github.com/go-chi/chi"
 	log "github.com/sirupsen/logrus"
@@ -23,13 +25,10 @@ const (
 
 	DefaultOffset = 0
 	DefaultLimit  = 10
-)
 
-type Request struct {
-	Title       string `json:"title"`
-	Description string `json:"description"`
-	// TODO add tags
-}
+	getAllSelect = "id, title, description, created_by, created_at, status"
+	ratingSum    = "(SELECT SUM(sum) as rating FROM (SELECT SUM(value) as sum FROM ratings WHERE record_id=questions.id AND kind='%s' UNION SELECT 0 as sum)) AS rating"
+)
 
 func Create(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
@@ -119,17 +118,23 @@ func GetAll(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	questions, err := models.Questions(qm.Where("status=?", StatusPublished), qm.Limit(limit), qm.Offset(offset)).All(ctx, db.Get())
-	if err != nil {
+	var resp []Response
+	if err := models.Questions(
+		qm.Select(getAllSelect,
+			fmt.Sprintf(ratingSum, ratings.QuestionKind)),
+		qm.Where("status=?", StatusPublished),
+		qm.Limit(limit),
+		qm.Offset(offset),
+	).
+		Bind(ctx, db.Get(), &resp);
+		err != nil {
 		log.Error(err)
 		api.InternalServerError(w)
 
 		return
 	}
 
-	// TODO get ratings count as well
-
-	api.SuccessResponse(w, questions)
+	api.SuccessResponse(w, resp)
 }
 
 func Get(w http.ResponseWriter, r *http.Request) {

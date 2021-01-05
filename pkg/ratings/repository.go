@@ -6,6 +6,7 @@ import (
 
 	"github.com/borosr/qa-site/pkg/db"
 	"github.com/borosr/qa-site/pkg/models"
+	"github.com/rs/xid"
 	"github.com/volatiletech/sqlboiler/v4/boil"
 	"github.com/volatiletech/sqlboiler/v4/queries/qm"
 )
@@ -41,6 +42,7 @@ func store(ctx context.Context, k kind, userID string, id string, value int16) (
 		return *r, err
 	} else {
 		r := models.Rating{
+			ID:       xid.New().String(),
 			Kind:     string(k),
 			RecordID: id,
 			RatedBy:  userID,
