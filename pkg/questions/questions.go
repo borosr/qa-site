@@ -2,14 +2,12 @@ package questions
 
 import (
 	"database/sql"
-	"fmt"
 	"net/http"
 	"strconv"
 
 	"github.com/borosr/qa-site/pkg/api"
 	"github.com/borosr/qa-site/pkg/db"
 	"github.com/borosr/qa-site/pkg/models"
-	"github.com/borosr/qa-site/pkg/ratings"
 	"github.com/friendsofgo/errors"
 	"github.com/go-chi/chi"
 	log "github.com/sirupsen/logrus"
@@ -27,7 +25,7 @@ const (
 	DefaultLimit  = 10
 
 	getAllSelect = "id, title, description, created_by, created_at, status"
-	ratingSum    = "(SELECT SUM(sum) as rating FROM (SELECT SUM(value) as sum FROM ratings WHERE record_id=questions.id AND kind='%s' UNION SELECT 0 as sum)) AS rating"
+	ratingSum    = "(SELECT SUM(sum) as rating FROM (SELECT SUM(value) as sum FROM ratings WHERE record_id=questions.id AND kind='question' UNION SELECT 0 as sum)) AS rating"
 )
 
 func Create(w http.ResponseWriter, r *http.Request) {
@@ -218,7 +216,7 @@ func getOffset(r *http.Request) (int, error) {
 
 func buildQuestionsRatingQuery() []qm.QueryMod {
 	return []qm.QueryMod{
-		qm.Select(getAllSelect, fmt.Sprintf(ratingSum, ratings.QuestionKind)),
+		qm.Select(getAllSelect, ratingSum),
 		qm.Where("status=?", StatusPublished),
 	}
 }

@@ -100,8 +100,6 @@ func GetMyAnswers(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// TODO get ratings count as well
-
 	api.SuccessResponse(w, answers)
 }
 
@@ -116,8 +114,6 @@ func GetQuestionsAnswers(w http.ResponseWriter, r *http.Request) {
 
 		return
 	}
-
-	// TODO get ratings count as well
 
 	api.SuccessResponse(w, answers)
 }
