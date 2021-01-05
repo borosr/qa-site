@@ -120,12 +120,9 @@ func GetAll(w http.ResponseWriter, r *http.Request) {
 
 	var resp []Response
 	if err := models.Questions(
-		qm.Select(getAllSelect,
-			fmt.Sprintf(ratingSum, ratings.QuestionKind)),
-		qm.Where("status=?", StatusPublished),
-		qm.Limit(limit),
-		qm.Offset(offset),
-	).
+		append(buildQuestionsRatingQuery(),
+			qm.Limit(limit),
+			qm.Offset(offset))...).
 		Bind(ctx, db.Get(), &resp);
 		err != nil {
 		log.Error(err)
@@ -141,8 +138,13 @@ func Get(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	id := chi.URLParam(r, "id")
 
-	question, err := models.Questions(qm.Where("id=?", id)).One(ctx, db.Get())
-	if err != nil && errors.Is(err, sql.ErrNoRows) {
+	var resp Response
+	if err := models.Questions(
+		append(
+			buildQuestionsRatingQuery(),
+			qm.And("id=?", id))...).
+		Bind(ctx, db.Get(), &resp);
+		err != nil && errors.Is(err, sql.ErrNoRows) {
 		api.NotFound(w)
 
 		return
@@ -152,9 +154,8 @@ func Get(w http.ResponseWriter, r *http.Request) {
 
 		return
 	}
-	// TODO get ratings count as well
 
-	api.SuccessResponse(w, question)
+	api.SuccessResponse(w, resp)
 }
 
 func Delete(w http.ResponseWriter, r *http.Request) {
@@ -213,4 +214,11 @@ func getOffset(r *http.Request) (int, error) {
 	}
 
 	return limit, err
+}
+
+func buildQuestionsRatingQuery() []qm.QueryMod {
+	return []qm.QueryMod{
+		qm.Select(getAllSelect, fmt.Sprintf(ratingSum, ratings.QuestionKind)),
+		qm.Where("status=?", StatusPublished),
+	}
 }
