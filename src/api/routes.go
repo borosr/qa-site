@@ -7,6 +7,7 @@ import (
 	"github.com/borosr/qa-site/pkg/auth"
 	"github.com/borosr/qa-site/pkg/healthcheck"
 	"github.com/borosr/qa-site/pkg/questions"
+	"github.com/borosr/qa-site/pkg/ratings"
 	"github.com/borosr/qa-site/pkg/settings"
 	"github.com/borosr/qa-site/pkg/users"
 	"github.com/chi-middleware/logrus-logger"
@@ -48,6 +49,10 @@ func Init() error {
 		loggedIn.Get("/answers", answers.GetMyAnswers)
 		loggedIn.Post("/answers", answers.Create)
 		loggedIn.Put("/answers/{id}", answers.Update)
+
+		loggedIn.Put("/{kind:(answers|questions)}/{id}/rate", ratings.Rate)
+		loggedIn.Put("/{kind:(answers|questions)}/{id}/unrate", ratings.Unrate)
+		loggedIn.Put("/{kind:(answers|questions)}/{id}/rate/dismiss", ratings.Dismiss)
 
 		loggedIn.Delete("/logout", auth.Logout)
 		loggedIn.Post("/revoke", auth.Revoke)

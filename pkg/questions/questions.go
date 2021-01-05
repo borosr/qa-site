@@ -23,13 +23,10 @@ const (
 
 	DefaultOffset = 0
 	DefaultLimit  = 10
-)
 
-type Request struct {
-	Title       string `json:"title"`
-	Description string `json:"description"`
-	// TODO add tags
-}
+	getAllSelect = "id, title, description, created_by, created_at, status"
+	ratingSum    = "(SELECT SUM(sum) as rating FROM (SELECT SUM(value) as sum FROM ratings WHERE record_id=questions.id AND kind='question' UNION SELECT 0 as sum)) AS rating"
+)
 
 func Create(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
@@ -119,23 +116,33 @@ func GetAll(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	questions, err := models.Questions(qm.Where("status=?", StatusPublished), qm.Limit(limit), qm.Offset(offset)).All(ctx, db.Get())
-	if err != nil {
+	var resp []Response
+	if err := models.Questions(
+		append(buildQuestionsRatingQuery(),
+			qm.Limit(limit),
+			qm.Offset(offset))...).
+		Bind(ctx, db.Get(), &resp);
+		err != nil {
 		log.Error(err)
 		api.InternalServerError(w)
 
 		return
 	}
 
-	api.SuccessResponse(w, questions)
+	api.SuccessResponse(w, resp)
 }
 
 func Get(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	id := chi.URLParam(r, "id")
 
-	question, err := models.Questions(qm.Where("id=?", id)).One(ctx, db.Get())
-	if err != nil && errors.Is(err, sql.ErrNoRows) {
+	var resp Response
+	if err := models.Questions(
+		append(
+			buildQuestionsRatingQuery(),
+			qm.And("id=?", id))...).
+		Bind(ctx, db.Get(), &resp);
+		err != nil && errors.Is(err, sql.ErrNoRows) {
 		api.NotFound(w)
 
 		return
@@ -146,7 +153,7 @@ func Get(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	api.SuccessResponse(w, question)
+	api.SuccessResponse(w, resp)
 }
 
 func Delete(w http.ResponseWriter, r *http.Request) {
@@ -205,4 +212,11 @@ func getOffset(r *http.Request) (int, error) {
 	}
 
 	return limit, err
+}
+
+func buildQuestionsRatingQuery() []qm.QueryMod {
+	return []qm.QueryMod{
+		qm.Select(getAllSelect, ratingSum),
+		qm.Where("status=?", StatusPublished),
+	}
 }

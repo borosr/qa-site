@@ -650,6 +650,84 @@ func testUserToManyCreatedByQuestions(t *testing.T) {
 	}
 }
 
+func testUserToManyRatedByRatings(t *testing.T) {
+	var err error
+	ctx := context.Background()
+	tx := MustTx(boil.BeginTx(ctx, nil))
+	defer func() { _ = tx.Rollback() }()
+
+	var a User
+	var b, c Rating
+
+	seed := randomize.NewSeed()
+	if err = randomize.Struct(seed, &a, userDBTypes, true, userColumnsWithDefault...); err != nil {
+		t.Errorf("Unable to randomize User struct: %s", err)
+	}
+
+	if err := a.Insert(ctx, tx, boil.Infer()); err != nil {
+		t.Fatal(err)
+	}
+
+	if err = randomize.Struct(seed, &b, ratingDBTypes, false, ratingColumnsWithDefault...); err != nil {
+		t.Fatal(err)
+	}
+	if err = randomize.Struct(seed, &c, ratingDBTypes, false, ratingColumnsWithDefault...); err != nil {
+		t.Fatal(err)
+	}
+
+	b.RatedBy = a.ID
+	c.RatedBy = a.ID
+
+	if err = b.Insert(ctx, tx, boil.Infer()); err != nil {
+		t.Fatal(err)
+	}
+	if err = c.Insert(ctx, tx, boil.Infer()); err != nil {
+		t.Fatal(err)
+	}
+
+	check, err := a.RatedByRatings().All(ctx, tx)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	bFound, cFound := false, false
+	for _, v := range check {
+		if v.RatedBy == b.RatedBy {
+			bFound = true
+		}
+		if v.RatedBy == c.RatedBy {
+			cFound = true
+		}
+	}
+
+	if !bFound {
+		t.Error("expected to find b")
+	}
+	if !cFound {
+		t.Error("expected to find c")
+	}
+
+	slice := UserSlice{&a}
+	if err = a.L.LoadRatedByRatings(ctx, tx, false, (*[]*User)(&slice), nil); err != nil {
+		t.Fatal(err)
+	}
+	if got := len(a.R.RatedByRatings); got != 2 {
+		t.Error("number of eager loaded records wrong, got:", got)
+	}
+
+	a.R.RatedByRatings = nil
+	if err = a.L.LoadRatedByRatings(ctx, tx, true, &a, nil); err != nil {
+		t.Fatal(err)
+	}
+	if got := len(a.R.RatedByRatings); got != 2 {
+		t.Error("number of eager loaded records wrong, got:", got)
+	}
+
+	if t.Failed() {
+		t.Logf("%#v", check)
+	}
+}
+
 func testUserToManyOwnerRevokeTokens(t *testing.T) {
 	var err error
 	ctx := context.Background()
@@ -870,6 +948,81 @@ func testUserToManyAddOpCreatedByQuestions(t *testing.T) {
 		}
 
 		count, err := a.CreatedByQuestions().Count(ctx, tx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if want := int64((i + 1) * 2); count != want {
+			t.Error("want", want, "got", count)
+		}
+	}
+}
+func testUserToManyAddOpRatedByRatings(t *testing.T) {
+	var err error
+
+	ctx := context.Background()
+	tx := MustTx(boil.BeginTx(ctx, nil))
+	defer func() { _ = tx.Rollback() }()
+
+	var a User
+	var b, c, d, e Rating
+
+	seed := randomize.NewSeed()
+	if err = randomize.Struct(seed, &a, userDBTypes, false, strmangle.SetComplement(userPrimaryKeyColumns, userColumnsWithoutDefault)...); err != nil {
+		t.Fatal(err)
+	}
+	foreigners := []*Rating{&b, &c, &d, &e}
+	for _, x := range foreigners {
+		if err = randomize.Struct(seed, x, ratingDBTypes, false, strmangle.SetComplement(ratingPrimaryKeyColumns, ratingColumnsWithoutDefault)...); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	if err := a.Insert(ctx, tx, boil.Infer()); err != nil {
+		t.Fatal(err)
+	}
+	if err = b.Insert(ctx, tx, boil.Infer()); err != nil {
+		t.Fatal(err)
+	}
+	if err = c.Insert(ctx, tx, boil.Infer()); err != nil {
+		t.Fatal(err)
+	}
+
+	foreignersSplitByInsertion := [][]*Rating{
+		{&b, &c},
+		{&d, &e},
+	}
+
+	for i, x := range foreignersSplitByInsertion {
+		err = a.AddRatedByRatings(ctx, tx, i != 0, x...)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		first := x[0]
+		second := x[1]
+
+		if a.ID != first.RatedBy {
+			t.Error("foreign key was wrong value", a.ID, first.RatedBy)
+		}
+		if a.ID != second.RatedBy {
+			t.Error("foreign key was wrong value", a.ID, second.RatedBy)
+		}
+
+		if first.R.RatedByUser != &a {
+			t.Error("relationship was not added properly to the foreign slice")
+		}
+		if second.R.RatedByUser != &a {
+			t.Error("relationship was not added properly to the foreign slice")
+		}
+
+		if a.R.RatedByRatings[i*2] != first {
+			t.Error("relationship struct slice not set to correct value")
+		}
+		if a.R.RatedByRatings[i*2+1] != second {
+			t.Error("relationship struct slice not set to correct value")
+		}
+
+		count, err := a.RatedByRatings().Count(ctx, tx)
 		if err != nil {
 			t.Fatal(err)
 		}
