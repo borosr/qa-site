@@ -3,6 +3,7 @@ package api
 import (
 	"net/http"
 
+	"github.com/borosr/qa-site/pkg/answers"
 	"github.com/borosr/qa-site/pkg/auth"
 	"github.com/borosr/qa-site/pkg/healthcheck"
 	"github.com/borosr/qa-site/pkg/questions"
@@ -40,6 +41,13 @@ func Init() error {
 		loggedIn.Delete("/questions/{id}", questions.Delete)
 		loggedIn.Post("/questions", questions.Create)
 		loggedIn.Put("/questions/{id}", questions.Update)
+
+		loggedIn.Get("/questions/{questionID}/answers", answers.GetQuestionsAnswers)
+		loggedIn.Put("/questions/{questionID}/answers/{answerID}/answered", answers.SetAnswered)
+
+		loggedIn.Get("/answers", answers.GetMyAnswers)
+		loggedIn.Post("/answers", answers.Create)
+		loggedIn.Put("/answers/{id}", answers.Update)
 
 		loggedIn.Delete("/logout", auth.Logout)
 		loggedIn.Post("/revoke", auth.Revoke)

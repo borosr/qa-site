@@ -830,7 +830,7 @@ func testQuestionsSelect(t *testing.T) {
 }
 
 var (
-	questionDBTypes = map[string]string{`ID`: `varchar`, `Title`: `varchar`, `Description`: `string`, `CreatedBy`: `varchar`, `CreatedAt`: `timestamp`, `Status`: `varchar`, `Rating`: `int8`}
+	questionDBTypes = map[string]string{`ID`: `varchar`, `Title`: `varchar`, `Description`: `string`, `CreatedBy`: `varchar`, `CreatedAt`: `timestamp`, `Status`: `varchar`}
 	_               = bytes.MinRead
 )
 

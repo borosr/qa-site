@@ -50,7 +50,6 @@ func Create(w http.ResponseWriter, r *http.Request) {
 		Description: req.Description,
 		CreatedBy:   loggedInUser.ID,
 		Status:      null.StringFrom(StatusPublished),
-		Rating:      null.Int64From(0),
 	}); err != nil {
 		log.Error(err)
 		api.InternalServerError(w)

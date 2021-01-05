@@ -30,7 +30,6 @@ type Question struct {
 	CreatedBy   string      `boil:"created_by" json:"created_by" toml:"created_by" yaml:"created_by"`
 	CreatedAt   null.Time   `boil:"created_at" json:"created_at,omitempty" toml:"created_at" yaml:"created_at,omitempty"`
 	Status      null.String `boil:"status" json:"status,omitempty" toml:"status" yaml:"status,omitempty"`
-	Rating      null.Int64  `boil:"rating" json:"rating,omitempty" toml:"rating" yaml:"rating,omitempty"`
 
 	R *questionR `boil:"-" json:"-" toml:"-" yaml:"-"`
 	L questionL  `boil:"-" json:"-" toml:"-" yaml:"-"`
@@ -43,7 +42,6 @@ var QuestionColumns = struct {
 	CreatedBy   string
 	CreatedAt   string
 	Status      string
-	Rating      string
 }{
 	ID:          "id",
 	Title:       "title",
@@ -51,7 +49,6 @@ var QuestionColumns = struct {
 	CreatedBy:   "created_by",
 	CreatedAt:   "created_at",
 	Status:      "status",
-	Rating:      "rating",
 }
 
 // Generated where
@@ -79,29 +76,6 @@ func (w whereHelpernull_String) GTE(x null.String) qm.QueryMod {
 	return qmhelper.Where(w.field, qmhelper.GTE, x)
 }
 
-type whereHelpernull_Int64 struct{ field string }
-
-func (w whereHelpernull_Int64) EQ(x null.Int64) qm.QueryMod {
-	return qmhelper.WhereNullEQ(w.field, false, x)
-}
-func (w whereHelpernull_Int64) NEQ(x null.Int64) qm.QueryMod {
-	return qmhelper.WhereNullEQ(w.field, true, x)
-}
-func (w whereHelpernull_Int64) IsNull() qm.QueryMod    { return qmhelper.WhereIsNull(w.field) }
-func (w whereHelpernull_Int64) IsNotNull() qm.QueryMod { return qmhelper.WhereIsNotNull(w.field) }
-func (w whereHelpernull_Int64) LT(x null.Int64) qm.QueryMod {
-	return qmhelper.Where(w.field, qmhelper.LT, x)
-}
-func (w whereHelpernull_Int64) LTE(x null.Int64) qm.QueryMod {
-	return qmhelper.Where(w.field, qmhelper.LTE, x)
-}
-func (w whereHelpernull_Int64) GT(x null.Int64) qm.QueryMod {
-	return qmhelper.Where(w.field, qmhelper.GT, x)
-}
-func (w whereHelpernull_Int64) GTE(x null.Int64) qm.QueryMod {
-	return qmhelper.Where(w.field, qmhelper.GTE, x)
-}
-
 var QuestionWhere = struct {
 	ID          whereHelperstring
 	Title       whereHelperstring
@@ -109,7 +83,6 @@ var QuestionWhere = struct {
 	CreatedBy   whereHelperstring
 	CreatedAt   whereHelpernull_Time
 	Status      whereHelpernull_String
-	Rating      whereHelpernull_Int64
 }{
 	ID:          whereHelperstring{field: "\"questions\".\"id\""},
 	Title:       whereHelperstring{field: "\"questions\".\"title\""},
@@ -117,7 +90,6 @@ var QuestionWhere = struct {
 	CreatedBy:   whereHelperstring{field: "\"questions\".\"created_by\""},
 	CreatedAt:   whereHelpernull_Time{field: "\"questions\".\"created_at\""},
 	Status:      whereHelpernull_String{field: "\"questions\".\"status\""},
-	Rating:      whereHelpernull_Int64{field: "\"questions\".\"rating\""},
 }
 
 // QuestionRels is where relationship names are stored.
@@ -144,9 +116,9 @@ func (*questionR) NewStruct() *questionR {
 type questionL struct{}
 
 var (
-	questionAllColumns            = []string{"id", "title", "description", "created_by", "created_at", "status", "rating"}
+	questionAllColumns            = []string{"id", "title", "description", "created_by", "created_at", "status"}
 	questionColumnsWithoutDefault = []string{"id", "title", "description", "created_by"}
-	questionColumnsWithDefault    = []string{"created_at", "status", "rating"}
+	questionColumnsWithDefault    = []string{"created_at", "status"}
 	questionPrimaryKeyColumns     = []string{"id"}
 )
 

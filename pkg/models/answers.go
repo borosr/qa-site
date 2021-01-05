@@ -29,6 +29,7 @@ type Answer struct {
 	CreatedBy  string    `boil:"created_by" json:"created_by" toml:"created_by" yaml:"created_by"`
 	CreatedAt  null.Time `boil:"created_at" json:"created_at,omitempty" toml:"created_at" yaml:"created_at,omitempty"`
 	Answered   null.Bool `boil:"answered" json:"answered,omitempty" toml:"answered" yaml:"answered,omitempty"`
+	Answer     string    `boil:"answer" json:"answer" toml:"answer" yaml:"answer"`
 
 	R *answerR `boil:"-" json:"-" toml:"-" yaml:"-"`
 	L answerL  `boil:"-" json:"-" toml:"-" yaml:"-"`
@@ -40,12 +41,14 @@ var AnswerColumns = struct {
 	CreatedBy  string
 	CreatedAt  string
 	Answered   string
+	Answer     string
 }{
 	ID:         "id",
 	QuestionID: "question_id",
 	CreatedBy:  "created_by",
 	CreatedAt:  "created_at",
 	Answered:   "answered",
+	Answer:     "answer",
 }
 
 // Generated where
@@ -125,12 +128,14 @@ var AnswerWhere = struct {
 	CreatedBy  whereHelperstring
 	CreatedAt  whereHelpernull_Time
 	Answered   whereHelpernull_Bool
+	Answer     whereHelperstring
 }{
 	ID:         whereHelperstring{field: "\"answers\".\"id\""},
 	QuestionID: whereHelperstring{field: "\"answers\".\"question_id\""},
 	CreatedBy:  whereHelperstring{field: "\"answers\".\"created_by\""},
 	CreatedAt:  whereHelpernull_Time{field: "\"answers\".\"created_at\""},
 	Answered:   whereHelpernull_Bool{field: "\"answers\".\"answered\""},
+	Answer:     whereHelperstring{field: "\"answers\".\"answer\""},
 }
 
 // AnswerRels is where relationship names are stored.
@@ -157,8 +162,8 @@ func (*answerR) NewStruct() *answerR {
 type answerL struct{}
 
 var (
-	answerAllColumns            = []string{"id", "question_id", "created_by", "created_at", "answered"}
-	answerColumnsWithoutDefault = []string{"id", "question_id", "created_by"}
+	answerAllColumns            = []string{"id", "question_id", "created_by", "created_at", "answered", "answer"}
+	answerColumnsWithoutDefault = []string{"id", "question_id", "created_by", "answer"}
 	answerColumnsWithDefault    = []string{"created_at", "answered"}
 	answerPrimaryKeyColumns     = []string{"id"}
 )
