@@ -32,8 +32,6 @@ const (
 )
 
 var (
-	tokenCache = map[string][]TokenCache{}
-
 	ErrForbidden = errors.New("forbidden")
 )
 
@@ -202,7 +200,7 @@ func Logout(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := deleteAccessToken(loggedInUser, jwtToken); err != nil {
+	if err := DeleteJwtToken(loggedInUser.ID, jwtToken); err != nil {
 		log.Errorf("invalid access token [%s]", jwtToken)
 		api.BadRequest(w)
 
@@ -315,20 +313,15 @@ func chainTokenBySID(ctx context.Context, claims jwt.MapClaims, jwtToken string)
 }
 
 func chainTokenCacheCheck(ctx context.Context, sid string, jwtToken string) (context.Context, error) {
-	if tokens, ok := tokenCache[sid]; ok {
-		now := time.Now()
-		var found bool
-		for _, t := range tokens {
-			if t.Token == jwtToken && now.Before(t.Expr) {
-				ctx, found = chainGetUserIfFound(ctx, sid)
-				break
-			}
-		}
-		if !found {
-			return ctx, ErrForbidden
-		}
-	} else {
-		log.Errorf("missing token to the sid [%s]", sid)
+	if err := ExistsAndNotExpired(sid, jwtToken, time.Now()); err != nil {
+		log.Error(err)
+
+		return ctx, err
+	}
+
+	var found bool
+	ctx, found = chainGetUserIfFound(ctx, sid)
+	if !found {
 		return ctx, ErrForbidden
 	}
 
@@ -354,10 +347,11 @@ func loggingIn(ctx context.Context, user models.User, now time.Time, tokenKind A
 		return Response{}, err
 	}
 
-	tokenCache[user.ID] = append(tokenCache[user.ID], TokenCache{
-		Token: token,
-		Expr:  now.Add(jwtTimeout),
-	})
+	if err := StoreJwtToken(user.ID, token, now.Add(jwtTimeout)); err != nil {
+		log.Error(err)
+
+		return Response{}, err
+	}
 
 	var revokeToken string
 	if revokeToken = GetRevokeToken(ctx, user.ID); revokeToken == "" {
@@ -379,7 +373,9 @@ func loggingIn(ctx context.Context, user models.User, now time.Time, tokenKind A
 }
 
 func renewTokens(ctx context.Context, user models.User, model *models.RevokeToken, token string) (Response, error) {
-	if err := deleteAccessToken(user, token); err != nil {
+	if err := DeleteJwtToken(user.ID, token); err != nil {
+		log.Error(err)
+
 		return Response{}, err
 	}
 
@@ -389,10 +385,11 @@ func renewTokens(ctx context.Context, user models.User, model *models.RevokeToke
 		return Response{}, err
 	}
 
-	tokenCache[user.ID] = append(tokenCache[user.ID], TokenCache{
-		Token: authToken,
-		Expr:  now.Add(jwtTimeout),
-	})
+	if err := StoreJwtToken(user.ID, token, now.Add(jwtTimeout)); err != nil {
+		log.Error(err)
+
+		return Response{}, err
+	}
 
 	revokeToken, err := generateRevokeToken(user, now)
 	if err != nil {
@@ -408,23 +405,4 @@ func renewTokens(ctx context.Context, user models.User, model *models.RevokeToke
 		RevokeToken: revokeToken,
 		AuthKind:    DefaultAuthKind,
 	}, nil
-}
-
-func deleteAccessToken(loggedInUser models.User, jwtToken string) error {
-	var tokenIndex = -1
-	for i, cache := range tokenCache[loggedInUser.ID] {
-		if cache.Token == jwtToken {
-			tokenIndex = i
-
-			break
-		}
-	}
-
-	if tokenIndex == -1 {
-		return fmt.Errorf("token not found [%s]", jwtToken)
-	}
-
-	tokenCache[loggedInUser.ID][tokenIndex] = tokenCache[loggedInUser.ID][len(tokenCache[loggedInUser.ID])-1]
-	tokenCache[loggedInUser.ID] = tokenCache[loggedInUser.ID][:len(tokenCache[loggedInUser.ID])-1]
-	return nil
 }
