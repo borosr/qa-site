@@ -53,7 +53,7 @@ func DefaultLogin(w http.ResponseWriter, r *http.Request) {
 	var user models.User
 	var err error
 	if user, err = users.FindByUsername(ctx, req.Username); err != nil {
-		log.Error(err)
+		log.Errorf("missing username from database: %s, error: %v", req.Username, err)
 		api.Forbidden(w)
 
 		return
@@ -67,7 +67,7 @@ func DefaultLogin(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := bcrypt.CompareHashAndPassword([]byte(user.Password.String), []byte(req.Password)); err != nil {
-		log.Error(err)
+		log.Errorf("comparing passwords: %v", err)
 		api.Forbidden(w)
 
 		return
@@ -75,7 +75,7 @@ func DefaultLogin(w http.ResponseWriter, r *http.Request) {
 
 	resp, err := loggingIn(ctx, user, time.Now(), DefaultAuthKind)
 	if err != nil {
-		log.Error(err)
+		log.Errorf("logging in: %v", err)
 		api.Forbidden(w)
 
 		return
@@ -91,7 +91,8 @@ func Middleware(next http.Handler) http.Handler {
 
 			var jwtToken string
 			if jwtToken = r.Header.Get(AuthorizationHeader); jwtToken == "" {
-				api.InternalServerError(w)
+				log.Error("missing token from header")
+				api.Forbidden(w)
 
 				return
 			}
@@ -107,7 +108,7 @@ func Middleware(next http.Handler) http.Handler {
 			})
 
 			if err != nil {
-				log.Error(err)
+				log.Errorf("error parsing jwt token %v", err)
 				api.Forbidden(w)
 
 				return
@@ -116,6 +117,7 @@ func Middleware(next http.Handler) http.Handler {
 			if claims, ok := token.Claims.(jwt.MapClaims); ok && token.Valid {
 				ctx, err = chainTokenBySID(ctx, claims, jwtToken)
 				if err != nil {
+					log.Errorf("error building jwt token: %v", err)
 					api.Forbidden(w)
 
 					return
@@ -212,7 +214,6 @@ func Logout(w http.ResponseWriter, r *http.Request) {
 
 func Revoke(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	loggedInUser := r.Context().Value("user").(models.User)
 
 	var revoke = struct {
 		Token string `json:"revoke_token"`
@@ -224,15 +225,7 @@ func Revoke(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	revokeTokenModel, err := models.RevokeTokens(qm.Where("owner_id=?", loggedInUser.ID), qm.And("token=?", revoke.Token)).One(ctx, db.Get())
-	if err != nil {
-		log.Error(err)
-		api.InternalServerError(w)
-
-		return
-	}
-
-	revokeToken, err := jwt.Parse(revokeTokenModel.Token, func(token *jwt.Token) (interface{}, error) {
+	revokeToken, err := jwt.Parse(revoke.Token, func(token *jwt.Token) (interface{}, error) {
 		// Don't forget to validate the alg is what you expect:
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
@@ -244,36 +237,63 @@ func Revoke(w http.ResponseWriter, r *http.Request) {
 
 	if err != nil {
 		log.Error(err)
-		api.InternalServerError(w)
+		api.Forbidden(w)
 
 		return
 	}
 
+	var claims jwt.MapClaims
+	var ok bool
+	if claims, ok = revokeToken.Claims.(jwt.MapClaims); !ok {
+		log.Errorf("invalid revoke token, unable to parse jwt claims: [%#v]", revokeToken.Claims)
+		api.Forbidden(w)
+
+		return
+	}
+
+	userID := claims["sid"].(string)
+	revokeTokenModel, err := models.RevokeTokens(
+		qm.Where("owner_id=?", userID),
+		qm.And("token=?", revoke.Token),
+	).One(ctx, db.Get())
+	if err != nil {
+		log.Errorf("error getting revoke token from database: %v", err)
+		api.Forbidden(w)
+
+		return
+	}
+
+	if exp, ok := claims["exp"].(int64); ok && time.Now().Unix() > exp {
+		log.Errorf("revoke token [%s] expired %d", revoke.Token, exp)
+		api.Forbidden(w)
+
+		return
+	}
 	var jwtToken string
 	if jwtToken = r.Header.Get(AuthorizationHeader); jwtToken == "" {
-		api.InternalServerError(w)
+		log.Error("missing jwt token from header")
+		api.Forbidden(w)
 
 		return
 	}
 
-	if claims, ok := revokeToken.Claims.(jwt.MapClaims); ok && revokeToken.Valid {
-		if exp, ok := claims["exp"].(int64); ok {
-			if time.Now().Unix() <= exp {
-				resp, err := renewTokens(ctx, loggedInUser, revokeTokenModel, jwtToken)
-				if err != nil {
-					log.Error(err)
-					api.InternalServerError(w)
+	user, err := models.FindUser(ctx, db.Get(), userID)
+	if err != nil {
+		log.Errorf("error getting owner of the token: %v", err)
+		api.Forbidden(w)
 
-					return
-				}
-				api.SuccessResponse(w, resp)
-
-				return
-			}
-		}
+		return
 	}
 
-	http.Redirect(w, r, "/api/logout", 301)
+	resp, err := renewTokens(ctx, *user, revokeTokenModel, jwtToken)
+	if err != nil {
+		log.Errorf("error renew the tokens token: %v", err)
+		api.Forbidden(w)
+
+		return
+	}
+	api.SuccessResponse(w, resp)
+
 }
 
 func generateAuthToken(user models.User, now time.Time) (string, error) {
@@ -306,10 +326,10 @@ func generateRevokeToken(user models.User, now time.Time) (string, error) {
 func chainTokenBySID(ctx context.Context, claims jwt.MapClaims, jwtToken string) (context.Context, error) {
 	if sid, ok := claims["sid"].(string); ok {
 		return chainTokenCacheCheck(ctx, sid, jwtToken)
-	} else {
-		log.Errorf("missing sid from claim [%+v]", claims)
-		return ctx, ErrForbidden
 	}
+	log.Errorf("missing sid from claim [%+v]", claims)
+
+	return ctx, ErrForbidden
 }
 
 func chainTokenCacheCheck(ctx context.Context, sid string, jwtToken string) (context.Context, error) {
@@ -385,7 +405,7 @@ func renewTokens(ctx context.Context, user models.User, model *models.RevokeToke
 		return Response{}, err
 	}
 
-	if err := StoreJwtToken(user.ID, token, now.Add(jwtTimeout)); err != nil {
+	if err := StoreJwtToken(user.ID, authToken, now.Add(jwtTimeout)); err != nil {
 		log.Error(err)
 
 		return Response{}, err

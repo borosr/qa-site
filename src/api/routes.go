@@ -55,7 +55,7 @@ func Init() error {
 		loggedIn.Put("/{kind:(answers|questions)}/{id}/rate/dismiss", ratings.Dismiss)
 
 		loggedIn.Delete("/logout", auth.Logout)
-		loggedIn.Post("/revoke", auth.Revoke)
+		r.Post("/revoke", auth.Revoke)
 	})
 
 	config := settings.Get()
