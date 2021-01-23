@@ -23,6 +23,7 @@ const (
 
 	DefaultOffset = 0
 	DefaultLimit  = 10
+	DefaultSort = "created_at"
 
 	getAllSelect = "id, title, description, created_by, created_at, status"
 	ratingSum    = "(SELECT SUM(sum) as rating FROM (SELECT SUM(value) as sum FROM ratings WHERE record_id=questions.id AND kind='question' UNION SELECT 0 as sum)) AS rating"
@@ -119,6 +120,7 @@ func GetAll(w http.ResponseWriter, r *http.Request) {
 	var resp []Response
 	if err := models.Questions(
 		append(buildQuestionsRatingQuery(),
+			qm.OrderBy(getSort(r)),
 			qm.Limit(limit),
 			qm.Offset(offset))...).
 		Bind(ctx, db.Get(), &resp);
@@ -141,6 +143,14 @@ func GetAll(w http.ResponseWriter, r *http.Request) {
 		Data:  resp,
 		Count: count,
 	})
+}
+
+func getSort(r *http.Request) string {
+	if queryValue := r.URL.Query().Get("sort"); queryValue != "" {
+		return queryValue
+	}
+
+	return DefaultSort
 }
 
 func Get(w http.ResponseWriter, r *http.Request) {
