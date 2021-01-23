@@ -49,7 +49,7 @@ func Rate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	api.SuccessResponse(w, result)
+	api.SuccessResponse(w, Response{Value: result})
 }
 
 func Unrate(w http.ResponseWriter, r *http.Request) {
@@ -80,7 +80,7 @@ func Unrate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	api.SuccessResponse(w, result)
+	api.SuccessResponse(w, Response{Value: result})
 }
 
 func Dismiss(w http.ResponseWriter, r *http.Request) {
@@ -129,7 +129,15 @@ func Dismiss(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	api.SuccessResponse(w, struct{ Msg string }{Msg: "Rate dismissed"})
+	result, err := getCurrentValue(ctx, k, loggedInUser.ID, id)
+	if err != nil {
+		log.Error(err)
+		api.InternalServerError(w)
+
+		return
+	}
+
+	api.SuccessResponse(w, Response{Value: result})
 }
 
 func isOwner(ctx context.Context, k kind, userID, id string) bool {

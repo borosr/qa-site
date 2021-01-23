@@ -15,12 +15,20 @@ func Exists(ctx context.Context, k kind, userID, recordID string) (bool, error) 
 	return models.Ratings(buildRateFilter(k, userID, recordID)...).Exists(ctx, db.Get())
 }
 
-func Rating(ctx context.Context, k kind, userID, id string) (models.Rating, error) {
-	return store(ctx, k, userID, id, defaultRateValue)
+func Rating(ctx context.Context, k kind, userID, id string) (int64, error) {
+	if _, err := store(ctx, k, userID, id, defaultRateValue); err != nil {
+		return 0, err
+	}
+
+	return getCurrentValue(ctx, k, userID, id)
 }
 
-func Unrating(ctx context.Context, k kind, userID, id string) (models.Rating, error) {
-	return store(ctx, k, userID, id, defaultUnrateValue)
+func Unrating(ctx context.Context, k kind, userID, id string) (int64, error) {
+	if _, err := store(ctx, k, userID, id, defaultUnrateValue); err != nil {
+		return 0, err
+	}
+
+	return getCurrentValue(ctx, k, userID, id)
 }
 
 func store(ctx context.Context, k kind, userID string, id string, value int16) (models.Rating, error) {
@@ -40,18 +48,30 @@ func store(ctx context.Context, k kind, userID string, id string, value int16) (
 		_, err = r.Update(ctx, db.Get(), boil.Infer())
 
 		return *r, err
-	} else {
-		r := models.Rating{
-			ID:       xid.New().String(),
-			Kind:     string(k),
-			RecordID: id,
-			RatedBy:  userID,
-			RatedAt:  time.Now(),
-			Value:    value,
-		}
-
-		return r, r.Insert(ctx, db.Get(), boil.Infer())
 	}
+
+	r := models.Rating{
+		ID:       xid.New().String(),
+		Kind:     string(k),
+		RecordID: id,
+		RatedBy:  userID,
+		RatedAt:  time.Now(),
+		Value:    value,
+	}
+
+	return r, r.Insert(ctx, db.Get(), boil.Infer())
+}
+
+func getCurrentValue(ctx context.Context, k kind, userID, recordID string) (int64, error) {
+	var data struct {
+		Value int64 `boil:"value"`
+	}
+
+	if err := models.Ratings(append(buildRateFilter(k, userID, recordID),
+		qm.Select("COALESCE(SUM(value), 0) as value"))...).Bind(ctx, db.Get(), &data); err != nil {
+		return 0, err
+	}
+	return data.Value, nil
 }
 
 func buildRateFilter(k kind, userID, recordID string) []qm.QueryMod {
