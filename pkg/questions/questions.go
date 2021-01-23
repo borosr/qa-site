@@ -26,7 +26,7 @@ const (
 	DefaultSort = "created_at"
 
 	getAllSelect = "id, title, description, created_by, created_at, status"
-	ratingSum    = "(SELECT SUM(sum) as rating FROM (SELECT SUM(value) as sum FROM ratings WHERE record_id=questions.id AND kind='question' UNION SELECT 0 as sum)) AS rating"
+	ratingSum    = "(SELECT COALESCE(SUM(value),0) as rating FROM ratings WHERE record_id=questions.id AND kind='question')"
 )
 
 func Create(w http.ResponseWriter, r *http.Request) {

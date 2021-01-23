@@ -6,3 +6,7 @@ const (
 )
 
 type kind string
+
+type Response struct {
+	Value int64 `json:"value"`
+}
