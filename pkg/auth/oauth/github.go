@@ -66,8 +66,8 @@ func (g GithubUserData) FullName() string {
 func (g GithubOAuth) Redirect(w http.ResponseWriter, r *http.Request) {
 	config := settings.Get()
 	http.Redirect(w, r,
-		fmt.Sprintf("https://github.com/login/oauth/authorize?client_id=%s&redirect_uri=%s://%s:%s/api/login/github/callback",
-			config.GithubClientID, "http", config.Hostname, config.Port),
+		fmt.Sprintf("https://github.com/login/oauth/authorize?client_id=%s&redirect_uri=%s://%s:%s/login/github/callback",
+			config.GithubClientID, "http", config.Hostname, "8081"),
 		http.StatusMovedPermanently)
 }
 
