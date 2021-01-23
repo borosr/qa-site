@@ -10,6 +10,11 @@ type Request struct {
 	// TODO add tags
 }
 
+type PageableResponse struct {
+	Data  []Response `json:"data"`
+	Count int64      `json:"count"`
+}
+
 type Response struct {
 	ID          string      `boil:"id" json:"id"`
 	Title       string      `boil:"title" json:"title"`
