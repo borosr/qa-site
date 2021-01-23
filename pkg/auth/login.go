@@ -108,7 +108,7 @@ func Middleware(next http.Handler) http.Handler {
 			})
 
 			if err != nil {
-				log.Errorf("error parsing jwt token %v", err)
+				log.Errorf("error parsing jwt token [%s]: %v", jwtToken, err)
 				api.Forbidden(w)
 
 				return
