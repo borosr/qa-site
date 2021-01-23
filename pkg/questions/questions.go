@@ -129,7 +129,18 @@ func GetAll(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	api.SuccessResponse(w, resp)
+	var count int64
+	if count, err = models.Questions(buildQuestionsRatingQuery()...).Count(ctx, db.Get()); err != nil {
+		log.Error(err)
+		api.InternalServerError(w)
+
+		return
+	}
+
+	api.SuccessResponse(w, PageableResponse{
+		Data:  resp,
+		Count: count,
+	})
 }
 
 func Get(w http.ResponseWriter, r *http.Request) {
