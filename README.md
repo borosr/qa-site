@@ -5,8 +5,8 @@ A test project to try out CockroachDB
 |Method|Path|Request|Response|
 |---|---|---|---|
 |GET|/api/status|none|Status 200, `{"Status":"ok"}`|
-|POST|/api/users|Status 200, `{"username":"user","password":"secret","full_name":"Sir John"}`|`{"Msg":"user successfully created"}`|
-|POST|/api/login|Status 200, `{"username":"user","password":"secret"}`|`{"token":"jwtToken","revoke_token":"revoke token","auth_kind":"DefaultLogin"}`|
+|POST|/api/users|`{"username":"user","password":"secret","full_name":"Sir John"}`|Status 200,`{"Msg":"user successfully created"}`|
+|POST|/api/login|`{"username":"user","password":"secret"}`|Status 200, `{"token":"jwtToken","revoke_token":"revoke token","auth_kind":"DefaultLogin"}`|
 |GET|/api/login/github|none|Status 301|
 |GET|/api/login/github/callback|?code=the_code_from_github|Status 200, `{"token":"jwtToken","revoke_token":"revoke token","auth_kind":"Github"}`|
 |GET|/api/users|none|Status 200, `[{"id":"user_id","username":"user","full_name":"Sir John"}]`|
