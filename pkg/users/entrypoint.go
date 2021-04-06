@@ -8,19 +8,27 @@ import (
 	"github.com/borosr/qa-site/pkg/api"
 	"github.com/borosr/qa-site/pkg/db"
 	"github.com/borosr/qa-site/pkg/models"
+	"github.com/borosr/qa-site/pkg/users/repository"
 	"github.com/friendsofgo/errors"
 	"github.com/go-chi/chi"
 	log "github.com/sirupsen/logrus"
 	"github.com/volatiletech/null/v8"
-	"github.com/volatiletech/sqlboiler/v4/boil"
 	"github.com/volatiletech/sqlboiler/v4/queries/qm"
 	"golang.org/x/crypto/bcrypt"
 )
 
-func Create(w http.ResponseWriter, r *http.Request) {
+type UserController struct {
+	userRepository repository.UserRepository
+}
+
+func NewController(userRepository repository.UserRepository) UserController {
+	return UserController{userRepository: userRepository}
+}
+
+func (c UserController) Create(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	user := models.User{}
-	if err := api.Bind(r, &user); err != nil || !validCreateRequest(ctx, user) {
+	if err := api.Bind(r, &user); err != nil || !c.validCreateRequest(ctx, user) {
 		api.BadRequest(w)
 
 		return
@@ -34,12 +42,13 @@ func Create(w http.ResponseWriter, r *http.Request) {
 		user.Password.SetValid(string(pass))
 	}
 
-	if err := Insert(ctx, user); err != nil {
+	if err := c.userRepository.Insert(ctx, user); err != nil {
 		api.InternalServerError(w)
 
 		return
 	}
 
+	// TODO use response type here
 	api.SuccessResponse(w, struct {
 		Msg string
 	}{
@@ -47,7 +56,7 @@ func Create(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-func validCreateRequest(ctx context.Context, user models.User) bool {
+func (c UserController) validCreateRequest(ctx context.Context, user models.User) bool {
 	valid := user.ID == "" && user.Username != "" &&
 		(user.FullName.Valid && user.FullName.String != "") && (user.Password.Valid && user.Password.String != "")
 
@@ -59,10 +68,10 @@ func validCreateRequest(ctx context.Context, user models.User) bool {
 	return valid
 }
 
-func GetAll(w http.ResponseWriter, r *http.Request) {
+func (c UserController) GetAll(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
-	users, err := models.Users(qm.Select("id, username, full_name")).All(ctx, db.Get())
+	users, err := c.userRepository.GetAll(ctx)
 	if errors.Is(err, sql.ErrNoRows) {
 		api.NotFound(w)
 
@@ -77,7 +86,7 @@ func GetAll(w http.ResponseWriter, r *http.Request) {
 	api.SuccessResponse(w, users)
 }
 
-func Get(w http.ResponseWriter, r *http.Request) {
+func (c UserController) Get(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	loggedInUser := r.Context().Value("user").(models.User)
 	if loggedInUser.ID != id {
@@ -86,7 +95,7 @@ func Get(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user, err := models.FindUser(r.Context(), db.Get(), id, "id", "username", "full_name")
+	user, err := c.userRepository.Get(r.Context(), id)
 	if err != nil {
 		api.InternalServerError(w)
 
@@ -96,7 +105,7 @@ func Get(w http.ResponseWriter, r *http.Request) {
 	api.SuccessResponse(w, user)
 }
 
-func Delete(w http.ResponseWriter, r *http.Request) {
+func (c UserController) Delete(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	loggedInUser := r.Context().Value("user").(models.User)
 	if loggedInUser.ID != id {
@@ -105,7 +114,7 @@ func Delete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if _, err := loggedInUser.Delete(r.Context(), db.Get()); err != nil {
+	if err := c.userRepository.Delete(r.Context(), loggedInUser); err != nil {
 		api.InternalServerError(w)
 
 		return
@@ -114,7 +123,7 @@ func Delete(w http.ResponseWriter, r *http.Request) {
 	api.SuccessResponse(w, struct{ Msg string }{Msg: "success"})
 }
 
-func Update(w http.ResponseWriter, r *http.Request) {
+func (c UserController) Update(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	id := chi.URLParam(r, "id")
 	loggedInUser := r.Context().Value("user").(models.User)
@@ -125,7 +134,7 @@ func Update(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var u models.User
-	if err := api.Bind(r, &u); err != nil || !validUpdateRequest(u) {
+	if err := api.Bind(r, &u); err != nil || !c.validUpdateRequest(u) {
 		api.BadRequest(w)
 
 		return
@@ -143,7 +152,7 @@ func Update(w http.ResponseWriter, r *http.Request) {
 		u.Password = loggedInUser.Password
 	}
 
-	if _, err := u.Update(ctx, db.Get(), boil.Infer()); err != nil {
+	if _, err := c.userRepository.Update(ctx, u); err != nil {
 		api.InternalServerError(w)
 
 		return
@@ -153,6 +162,6 @@ func Update(w http.ResponseWriter, r *http.Request) {
 	api.SuccessResponse(w, u)
 }
 
-func validUpdateRequest(u models.User) bool {
+func (c UserController) validUpdateRequest(u models.User) bool {
 	return u.Username != "" && u.FullName.String != ""
 }

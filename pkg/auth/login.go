@@ -9,18 +9,17 @@ import (
 
 	"github.com/borosr/qa-site/pkg/api"
 	"github.com/borosr/qa-site/pkg/auth/oauth"
+	authRepo "github.com/borosr/qa-site/pkg/auth/repository"
 	"github.com/borosr/qa-site/pkg/db"
 	"github.com/borosr/qa-site/pkg/models"
 	"github.com/borosr/qa-site/pkg/settings"
-	"github.com/borosr/qa-site/pkg/users"
+	userRepo "github.com/borosr/qa-site/pkg/users/repository"
 	"github.com/dgrijalva/jwt-go"
 	"github.com/friendsofgo/errors"
 	"github.com/go-chi/chi"
 	"github.com/rs/xid"
 	log "github.com/sirupsen/logrus"
 	"github.com/volatiletech/null/v8"
-	"github.com/volatiletech/sqlboiler/v4/boil"
-	"github.com/volatiletech/sqlboiler/v4/queries/qm"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -40,7 +39,20 @@ type TokenCache struct {
 	Expr  time.Time
 }
 
-func DefaultLogin(w http.ResponseWriter, r *http.Request) {
+type Controller struct {
+	userRepository userRepo.UserRepository
+	authRepository authRepo.AuthRepository
+}
+
+func NewController(userRepository userRepo.UserRepository,
+	authRepository authRepo.AuthRepository) Controller {
+	return Controller{
+		userRepository: userRepository,
+		authRepository: authRepository,
+	}
+}
+
+func (ac Controller) DefaultLogin(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	req := Request{}
 	if err := api.Bind(r, &req); err != nil {
@@ -52,7 +64,7 @@ func DefaultLogin(w http.ResponseWriter, r *http.Request) {
 
 	var user models.User
 	var err error
-	if user, err = users.FindByUsername(ctx, req.Username); err != nil {
+	if user, err = ac.userRepository.FindByUsername(ctx, req.Username); err != nil {
 		log.Errorf("missing username from database: %s, error: %v", req.Username, err)
 		api.Forbidden(w)
 
@@ -73,7 +85,7 @@ func DefaultLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	resp, err := loggingIn(ctx, user, time.Now(), DefaultAuthKind)
+	resp, err := ac.loggingIn(ctx, user, time.Now(), DefaultAuthKind)
 	if err != nil {
 		log.Errorf("logging in: %v", err)
 		api.Forbidden(w)
@@ -84,7 +96,7 @@ func DefaultLogin(w http.ResponseWriter, r *http.Request) {
 	api.SuccessResponse(w, resp)
 }
 
-func Middleware(next http.Handler) http.Handler {
+func (ac Controller) Middleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
 			ctx := r.Context()
@@ -115,7 +127,7 @@ func Middleware(next http.Handler) http.Handler {
 			}
 
 			if claims, ok := token.Claims.(jwt.MapClaims); ok && token.Valid {
-				ctx, err = chainTokenBySID(ctx, claims, jwtToken)
+				ctx, err = ac.chainTokenBySID(ctx, claims, jwtToken)
 				if err != nil {
 					log.Errorf("error building jwt token: %v", err)
 					api.Forbidden(w)
@@ -133,7 +145,7 @@ func Middleware(next http.Handler) http.Handler {
 		})
 }
 
-func SocialMediaRedirect(w http.ResponseWriter, r *http.Request) {
+func (ac Controller) SocialMediaRedirect(w http.ResponseWriter, r *http.Request) {
 	provider := chi.URLParam(r, "media")
 
 	if err := oauth.Redirect(w, r, provider); err != nil {
@@ -141,7 +153,7 @@ func SocialMediaRedirect(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func SocialMediaCallback(w http.ResponseWriter, r *http.Request) {
+func (ac Controller) SocialMediaCallback(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	provider := chi.URLParam(r, "media")
 
@@ -153,15 +165,15 @@ func SocialMediaCallback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user, err := models.Users(qm.Where("username=?", callbackResp.UserDetails.Username())).One(ctx, db.Get())
+	user, err := ac.userRepository.FindByUsername(ctx, callbackResp.UserDetails.Username())
 	if errors.Is(err, sql.ErrNoRows) {
-		user = &models.User{
+		user = models.User{
 			ID:          xid.New().String(),
 			Username:    callbackResp.UserDetails.Username(),
 			FullName:    null.StringFrom(callbackResp.UserDetails.FullName()),
 			AccessToken: null.StringFrom(callbackResp.Response.AccessToken),
 		}
-		if err := user.Insert(ctx, db.Get(), boil.Infer()); err != nil {
+		if err := ac.userRepository.Insert(ctx, user); err != nil {
 			api.InternalServerError(w)
 
 			return
@@ -173,7 +185,7 @@ func SocialMediaCallback(w http.ResponseWriter, r *http.Request) {
 		return
 	} else {
 		user.AccessToken.SetValid(callbackResp.Response.AccessToken)
-		if _, err := user.Update(ctx, db.Get(), boil.Infer()); err != nil {
+		if _, err := ac.userRepository.Update(ctx, user); err != nil {
 			log.Error(err)
 			api.InternalServerError(w)
 
@@ -181,7 +193,7 @@ func SocialMediaCallback(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	resp, err := loggingIn(ctx, *user, time.Now(), GithubAuthKind)
+	resp, err := ac.loggingIn(ctx, user, time.Now(), GithubAuthKind)
 	if err != nil {
 		log.Error(err)
 		api.Forbidden(w)
@@ -192,7 +204,7 @@ func SocialMediaCallback(w http.ResponseWriter, r *http.Request) {
 	api.SuccessResponse(w, resp)
 }
 
-func Logout(w http.ResponseWriter, r *http.Request) {
+func (ac Controller) Logout(w http.ResponseWriter, r *http.Request) {
 	loggedInUser := r.Context().Value("user").(models.User)
 
 	var jwtToken string
@@ -202,7 +214,7 @@ func Logout(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := DeleteJwtToken(loggedInUser.ID, jwtToken); err != nil {
+	if err := ac.authRepository.DeleteJwtToken(loggedInUser.ID, jwtToken); err != nil {
 		log.Errorf("invalid access token [%s]", jwtToken)
 		api.BadRequest(w)
 
@@ -212,7 +224,7 @@ func Logout(w http.ResponseWriter, r *http.Request) {
 	api.SuccessResponse(w, struct{ Msg string }{Msg: "Logout success"})
 }
 
-func Revoke(w http.ResponseWriter, r *http.Request) {
+func (ac Controller) Revoke(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
 	var revoke = struct {
@@ -252,10 +264,7 @@ func Revoke(w http.ResponseWriter, r *http.Request) {
 	}
 
 	userID := claims["sid"].(string)
-	revokeTokenModel, err := models.RevokeTokens(
-		qm.Where("owner_id=?", userID),
-		qm.And("token=?", revoke.Token),
-	).One(ctx, db.Get())
+	revokeTokenModel, err := ac.authRepository.FindRevokeTokenBy(ctx, userID, revoke.Token)
 	if err != nil {
 		log.Errorf("error getting revoke token from database: %v", err)
 		api.Forbidden(w)
@@ -285,7 +294,7 @@ func Revoke(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	resp, err := renewTokens(ctx, *user, revokeTokenModel, jwtToken)
+	resp, err := ac.renewTokens(ctx, *user, revokeTokenModel, jwtToken)
 	if err != nil {
 		log.Errorf("error renew the tokens token: %v", err)
 		api.Forbidden(w)
@@ -296,7 +305,7 @@ func Revoke(w http.ResponseWriter, r *http.Request) {
 
 }
 
-func generateAuthToken(user models.User, now time.Time) (string, error) {
+func (ac Controller) generateAuthToken(user models.User, now time.Time) (string, error) {
 	token, err := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
 		"sub": user.Username,
 		"sid": user.ID,
@@ -309,7 +318,7 @@ func generateAuthToken(user models.User, now time.Time) (string, error) {
 	return token, err
 }
 
-func generateRevokeToken(user models.User, now time.Time) (string, error) {
+func (ac Controller) generateRevokeToken(user models.User, now time.Time) (string, error) {
 	revokeToken, err := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
 		"sub": user.Username,
 		"sid": user.ID,
@@ -323,24 +332,24 @@ func generateRevokeToken(user models.User, now time.Time) (string, error) {
 	return revokeToken, err
 }
 
-func chainTokenBySID(ctx context.Context, claims jwt.MapClaims, jwtToken string) (context.Context, error) {
+func (ac Controller) chainTokenBySID(ctx context.Context, claims jwt.MapClaims, jwtToken string) (context.Context, error) {
 	if sid, ok := claims["sid"].(string); ok {
-		return chainTokenCacheCheck(ctx, sid, jwtToken)
+		return ac.chainTokenCacheCheck(ctx, sid, jwtToken)
 	}
 	log.Errorf("missing sid from claim [%+v]", claims)
 
 	return ctx, ErrForbidden
 }
 
-func chainTokenCacheCheck(ctx context.Context, sid string, jwtToken string) (context.Context, error) {
-	if err := ExistsAndNotExpired(sid, jwtToken, time.Now()); err != nil {
+func (ac Controller) chainTokenCacheCheck(ctx context.Context, sid string, jwtToken string) (context.Context, error) {
+	if err := ac.authRepository.ExistsAndNotExpired(sid, jwtToken, time.Now()); err != nil {
 		log.Error(err)
 
 		return ctx, err
 	}
 
 	var found bool
-	ctx, found = chainGetUserIfFound(ctx, sid)
+	ctx, found = ac.chainGetUserIfFound(ctx, sid)
 	if !found {
 		return ctx, ErrForbidden
 	}
@@ -348,7 +357,7 @@ func chainTokenCacheCheck(ctx context.Context, sid string, jwtToken string) (con
 	return ctx, nil
 }
 
-func chainGetUserIfFound(ctx context.Context, sid string) (context.Context, bool) {
+func (ac Controller) chainGetUserIfFound(ctx context.Context, sid string) (context.Context, bool) {
 	var found bool
 	user, err := models.FindUser(ctx, db.Get(), sid)
 	if err == nil && user != nil {
@@ -361,26 +370,26 @@ func chainGetUserIfFound(ctx context.Context, sid string) (context.Context, bool
 	return ctx, found
 }
 
-func loggingIn(ctx context.Context, user models.User, now time.Time, tokenKind AuthKind) (Response, error) {
-	token, err := generateAuthToken(user, now)
+func (ac Controller) loggingIn(ctx context.Context, user models.User, now time.Time, tokenKind Kind) (Response, error) {
+	token, err := ac.generateAuthToken(user, now)
 	if err != nil {
 		return Response{}, err
 	}
 
-	if err := StoreJwtToken(user.ID, token, now.Add(jwtTimeout)); err != nil {
+	if err := ac.authRepository.StoreJwtToken(user.ID, token, now.Add(jwtTimeout)); err != nil {
 		log.Error(err)
 
 		return Response{}, err
 	}
 
 	var revokeToken string
-	if revokeToken = GetRevokeToken(ctx, user.ID); revokeToken == "" {
+	if revokeToken = ac.authRepository.GetRevokeToken(ctx, user.ID); revokeToken == "" {
 		var err error
-		revokeToken, err = generateRevokeToken(user, now)
+		revokeToken, err = ac.generateRevokeToken(user, now)
 		if err != nil {
 			return Response{}, err
 		}
-		if err := StoreRevokeToken(ctx, user.ID, revokeToken); err != nil {
+		if err := ac.authRepository.StoreRevokeToken(ctx, user.ID, revokeToken); err != nil {
 			return Response{}, err
 		}
 	}
@@ -392,31 +401,31 @@ func loggingIn(ctx context.Context, user models.User, now time.Time, tokenKind A
 	}, nil
 }
 
-func renewTokens(ctx context.Context, user models.User, model *models.RevokeToken, token string) (Response, error) {
-	if err := DeleteJwtToken(user.ID, token); err != nil {
+func (ac Controller) renewTokens(ctx context.Context, user models.User, model *models.RevokeToken, token string) (Response, error) {
+	if err := ac.authRepository.DeleteJwtToken(user.ID, token); err != nil {
 		log.Error(err)
 
 		return Response{}, err
 	}
 
 	now := time.Now()
-	authToken, err := generateAuthToken(user, now)
+	authToken, err := ac.generateAuthToken(user, now)
 	if err != nil {
 		return Response{}, err
 	}
 
-	if err := StoreJwtToken(user.ID, authToken, now.Add(jwtTimeout)); err != nil {
+	if err := ac.authRepository.StoreJwtToken(user.ID, authToken, now.Add(jwtTimeout)); err != nil {
 		log.Error(err)
 
 		return Response{}, err
 	}
 
-	revokeToken, err := generateRevokeToken(user, now)
+	revokeToken, err := ac.generateRevokeToken(user, now)
 	if err != nil {
 		return Response{}, err
 	}
 	model.Token = revokeToken
-	if _, err := model.Update(ctx, db.Get(), boil.Infer()); err != nil {
+	if _, err := ac.authRepository.Update(ctx, model); err != nil {
 		return Response{}, err
 	}
 
