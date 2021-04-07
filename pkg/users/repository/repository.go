@@ -52,3 +52,8 @@ func (ur UserRepository) Update(ctx context.Context, u models.User) (models.User
 	_, err := u.Update(ctx, ur.db, boil.Infer())
 	return u, err
 }
+
+func (ur UserRepository) ExistsByUsername(ctx context.Context, username string) bool {
+	exists, err := models.Users(qm.Where("username=?", username)).Exists(ctx, ur.db)
+	return err != nil || exists
+}

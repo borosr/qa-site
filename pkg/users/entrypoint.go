@@ -6,14 +6,12 @@ import (
 	"net/http"
 
 	"github.com/borosr/qa-site/pkg/api"
-	"github.com/borosr/qa-site/pkg/db"
 	"github.com/borosr/qa-site/pkg/models"
 	"github.com/borosr/qa-site/pkg/users/repository"
 	"github.com/friendsofgo/errors"
 	"github.com/go-chi/chi"
 	log "github.com/sirupsen/logrus"
 	"github.com/volatiletech/null/v8"
-	"github.com/volatiletech/sqlboiler/v4/queries/qm"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -60,7 +58,7 @@ func (c UserController) validCreateRequest(ctx context.Context, user models.User
 	valid := user.ID == "" && user.Username != "" &&
 		(user.FullName.Valid && user.FullName.String != "") && (user.Password.Valid && user.Password.String != "")
 
-	if exists, err := models.Users(qm.Where("username=?", user.Username)).Exists(ctx, db.Get()); err != nil || exists {
+	if c.userRepository.ExistsByUsername(ctx, user.Username) {
 		log.Warnf("user with username [%s] already exist", user.Username)
 		return false
 	}
@@ -134,7 +132,7 @@ func (c UserController) Update(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var u models.User
-	if err := api.Bind(r, &u); err != nil || !c.validUpdateRequest(u) {
+	if err := api.Bind(r, &u); err != nil || !validUpdateRequest(u) {
 		api.BadRequest(w)
 
 		return
@@ -162,6 +160,6 @@ func (c UserController) Update(w http.ResponseWriter, r *http.Request) {
 	api.SuccessResponse(w, u)
 }
 
-func (c UserController) validUpdateRequest(u models.User) bool {
+func validUpdateRequest(u models.User) bool {
 	return u.Username != "" && u.FullName.String != ""
 }

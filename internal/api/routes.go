@@ -12,6 +12,7 @@ import (
 	"github.com/borosr/qa-site/pkg/questions"
 	questionRepository "github.com/borosr/qa-site/pkg/questions/repository"
 	"github.com/borosr/qa-site/pkg/ratings"
+	rateRepository "github.com/borosr/qa-site/pkg/ratings/repository"
 	"github.com/borosr/qa-site/pkg/settings"
 	"github.com/borosr/qa-site/pkg/users"
 	userRepository "github.com/borosr/qa-site/pkg/users/repository"
@@ -32,10 +33,13 @@ func Init() error {
 	aur := authRepository.NewRepository(db.GetBDB(), db.Get())
 	qr := questionRepository.NewRepository(db.Get())
 	anr := answerRepository.NewRepository(db.Get())
+	rr := rateRepository.NewRepository(db.Get())
+
 	uc := users.NewController(ur)
 	auc := auth.NewController(ur, aur)
 	qc := questions.NewController(qr)
 	anc := answers.NewController(anr, qr)
+	rc := ratings.NewController(rr)
 
 	r.Route("/api", func(r chi.Router) {
 		loggedIn := r.With(auc.Middleware)
@@ -44,29 +48,38 @@ func Init() error {
 
 		initAuth(r, auc, loggedIn)
 		initUsers(r, uc, loggedIn)
-
-		loggedIn.Get("/questions", qc.GetAll)
-		loggedIn.Get("/questions/{id}", qc.Get)
-		loggedIn.Delete("/questions/{id}", qc.Delete)
-		loggedIn.Post("/questions", qc.Create)
-		loggedIn.Put("/questions/{id}", qc.Update)
-
-		loggedIn.Get("/questions/{questionID}/answers", anc.GetQuestionsAnswers)
-		loggedIn.Put("/questions/{questionID}/answers/{answerID}/answered", anc.SetAnswered)
-
-		loggedIn.Get("/answers", anc.GetMyAnswers)
-		loggedIn.Post("/answers", anc.Create)
-		loggedIn.Put("/answers/{id}", anc.Update)
-
-		loggedIn.Put("/{kind:(answers|questions)}/{id}/rate", ratings.Rate)
-		loggedIn.Put("/{kind:(answers|questions)}/{id}/unrate", ratings.Unrate)
-		loggedIn.Put("/{kind:(answers|questions)}/{id}/rate/dismiss", ratings.Dismiss)
+		initQuestions(loggedIn, qc)
+		initAnswers(loggedIn, anc)
+		initRatings(loggedIn, rc)
 	})
 
 	config := settings.Get()
 	log.Infof("Running the API on port: %s", config.Port)
 
 	return http.ListenAndServe(":"+config.Port, r)
+}
+
+func initRatings(loggedIn chi.Router, rc ratings.RateController) {
+	loggedIn.Put("/{kind:(answers|questions)}/{id}/rate", rc.Rate)
+	loggedIn.Put("/{kind:(answers|questions)}/{id}/unrate", rc.Unrate)
+	loggedIn.Put("/{kind:(answers|questions)}/{id}/rate/dismiss", rc.Dismiss)
+}
+
+func initAnswers(loggedIn chi.Router, anc answers.AnswerController) {
+	loggedIn.Get("/questions/{questionID}/answers", anc.GetQuestionsAnswers)
+	loggedIn.Put("/questions/{questionID}/answers/{answerID}/answered", anc.SetAnswered)
+
+	loggedIn.Get("/answers", anc.GetMyAnswers)
+	loggedIn.Post("/answers", anc.Create)
+	loggedIn.Put("/answers/{id}", anc.Update)
+}
+
+func initQuestions(loggedIn chi.Router, qc questions.QuestionController) {
+	loggedIn.Get("/questions", qc.GetAll)
+	loggedIn.Get("/questions/{id}", qc.Get)
+	loggedIn.Delete("/questions/{id}", qc.Delete)
+	loggedIn.Post("/questions", qc.Create)
+	loggedIn.Put("/questions/{id}", qc.Update)
 }
 
 func initAuth(r chi.Router, ac auth.Controller, loggedIn chi.Router) {
