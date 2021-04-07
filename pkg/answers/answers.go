@@ -2,13 +2,13 @@ package answers
 
 import (
 	"database/sql"
+	"errors"
 	"net/http"
 
 	"github.com/borosr/qa-site/pkg/answers/repository"
 	"github.com/borosr/qa-site/pkg/api"
 	"github.com/borosr/qa-site/pkg/models"
 	questionRepository "github.com/borosr/qa-site/pkg/questions/repository"
-	"github.com/friendsofgo/errors"
 	"github.com/go-chi/chi"
 	log "github.com/sirupsen/logrus"
 	"github.com/volatiletech/null/v8"

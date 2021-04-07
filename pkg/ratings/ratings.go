@@ -2,6 +2,7 @@ package ratings
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 	"net/http"
 
@@ -9,7 +10,6 @@ import (
 	"github.com/borosr/qa-site/pkg/db"
 	"github.com/borosr/qa-site/pkg/models"
 	"github.com/borosr/qa-site/pkg/ratings/repository"
-	"github.com/friendsofgo/errors"
 	"github.com/go-chi/chi"
 	log "github.com/sirupsen/logrus"
 )

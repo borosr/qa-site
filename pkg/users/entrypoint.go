@@ -3,12 +3,12 @@ package users
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"net/http"
 
 	"github.com/borosr/qa-site/pkg/api"
 	"github.com/borosr/qa-site/pkg/models"
 	"github.com/borosr/qa-site/pkg/users/repository"
-	"github.com/friendsofgo/errors"
 	"github.com/go-chi/chi"
 	log "github.com/sirupsen/logrus"
 	"github.com/volatiletech/null/v8"

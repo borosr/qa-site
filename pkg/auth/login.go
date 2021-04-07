@@ -3,6 +3,7 @@ package auth
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"net/http"
 	"time"
@@ -15,7 +16,6 @@ import (
 	"github.com/borosr/qa-site/pkg/settings"
 	userRepo "github.com/borosr/qa-site/pkg/users/repository"
 	"github.com/dgrijalva/jwt-go"
-	"github.com/friendsofgo/errors"
 	"github.com/go-chi/chi"
 	"github.com/rs/xid"
 	log "github.com/sirupsen/logrus"
