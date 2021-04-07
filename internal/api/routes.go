@@ -13,6 +13,7 @@ import (
 	"github.com/borosr/qa-site/pkg/settings"
 	"github.com/borosr/qa-site/pkg/users"
 	userRepository "github.com/borosr/qa-site/pkg/users/repository"
+	questionRepository "github.com/borosr/qa-site/pkg/questions/repository"
 	"github.com/chi-middleware/logrus-logger"
 	"github.com/go-chi/chi"
 	"github.com/go-chi/chi/middleware"
@@ -28,8 +29,10 @@ func Init() error {
 
 	ur := userRepository.NewRepository(db.Get())
 	ar := authRepository.NewRepository(db.GetBDB(), db.Get())
+	qr := questionRepository.NewRepository(db.Get())
 	uc := users.NewController(ur)
 	ac := auth.NewController(ur, ar)
+	qc := questions.NewController(qr)
 
 	r.Route("/api", func(r chi.Router) {
 		loggedIn := r.With(ac.Middleware)
@@ -39,11 +42,11 @@ func Init() error {
 		initAuth(r, ac, loggedIn)
 		initUsers(r, uc, loggedIn)
 
-		loggedIn.Get("/questions", questions.GetAll)
-		loggedIn.Get("/questions/{id}", questions.Get)
-		loggedIn.Delete("/questions/{id}", questions.Delete)
-		loggedIn.Post("/questions", questions.Create)
-		loggedIn.Put("/questions/{id}", questions.Update)
+		loggedIn.Get("/questions", qc.GetAll)
+		loggedIn.Get("/questions/{id}", qc.Get)
+		loggedIn.Delete("/questions/{id}", qc.Delete)
+		loggedIn.Post("/questions", qc.Create)
+		loggedIn.Put("/questions/{id}", qc.Update)
 
 		loggedIn.Get("/questions/{questionID}/answers", answers.GetQuestionsAnswers)
 		loggedIn.Put("/questions/{questionID}/answers/{answerID}/answered", answers.SetAnswered)
