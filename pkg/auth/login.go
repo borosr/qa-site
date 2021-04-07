@@ -34,11 +34,6 @@ var (
 	ErrForbidden = errors.New("forbidden")
 )
 
-type TokenCache struct {
-	Token string
-	Expr  time.Time
-}
-
 type Controller struct {
 	userRepository userRepo.UserRepository
 	authRepository authRepo.AuthRepository

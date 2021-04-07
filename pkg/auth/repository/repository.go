@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/borosr/qa-site/pkg/auth"
 	"github.com/borosr/qa-site/pkg/db"
 	"github.com/borosr/qa-site/pkg/models"
 	"github.com/dgraph-io/badger/v2"
@@ -56,7 +55,7 @@ func (ar AuthRepository) StoreJwtToken(ownerID, token string, expr time.Time) er
 	return ar.bdb.Update(func(txn *badger.Txn) error {
 		item, err := txn.Get([]byte(ownerID))
 		if err != nil && errors.Is(err, badger.ErrKeyNotFound) {
-			value, _ := json.Marshal([]auth.TokenCache{{Token: token, Expr: expr}})
+			value, _ := json.Marshal([]TokenCache{{Token: token, Expr: expr}})
 
 			return txn.Set([]byte(ownerID), value)
 		} else if err != nil {
@@ -64,11 +63,11 @@ func (ar AuthRepository) StoreJwtToken(ownerID, token string, expr time.Time) er
 		}
 
 		return item.Value(func(val []byte) error {
-			var tokens []auth.TokenCache
+			var tokens []TokenCache
 			if err := json.Unmarshal(val, &tokens); err != nil {
 				return err
 			}
-			tokens = append(tokens, auth.TokenCache{Token: token, Expr: expr})
+			tokens = append(tokens, TokenCache{Token: token, Expr: expr})
 			value, _ := json.Marshal(tokens)
 
 			return txn.Set([]byte(ownerID), value)
@@ -84,7 +83,7 @@ func (ar AuthRepository) DeleteJwtToken(ownerID, token string) error {
 		}
 
 		return item.Value(func(val []byte) error {
-			var tokens []auth.TokenCache
+			var tokens []TokenCache
 			if err := json.Unmarshal(val, &tokens); err != nil {
 				return err
 			}
@@ -121,7 +120,7 @@ func (ar AuthRepository) ExistsAndNotExpired(ownerID, token string, now time.Tim
 		}
 
 		return item.Value(func(val []byte) error {
-			var tokens []auth.TokenCache
+			var tokens []TokenCache
 			if err := json.Unmarshal(val, &tokens); err != nil {
 				return err
 			}
