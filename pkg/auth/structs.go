@@ -3,11 +3,11 @@ package auth
 import "github.com/volatiletech/null/v8"
 
 const (
-	DefaultAuthKind AuthKind = "DefaultLogin"
-	GithubAuthKind           = "Github"
+	DefaultAuthKind Kind = "DefaultLogin"
+	GithubAuthKind       = "Github"
 )
 
-type AuthKind string
+type Kind string
 
 type Request struct {
 	Username string      `json:"username"`
@@ -16,7 +16,7 @@ type Request struct {
 }
 
 type Response struct {
-	Token       string   `json:"token"`
-	RevokeToken string   `json:"revoke_token"`
-	AuthKind    AuthKind `json:"auth_kind"`
+	Token       string `json:"token"`
+	RevokeToken string `json:"revoke_token"`
+	AuthKind    Kind   `json:"auth_kind"`
 }

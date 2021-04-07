@@ -2,29 +2,32 @@ package answers
 
 import (
 	"database/sql"
+	"errors"
 	"net/http"
 
+	"github.com/borosr/qa-site/pkg/answers/repository"
 	"github.com/borosr/qa-site/pkg/api"
-	"github.com/borosr/qa-site/pkg/db"
 	"github.com/borosr/qa-site/pkg/models"
-	"github.com/friendsofgo/errors"
+	questionRepository "github.com/borosr/qa-site/pkg/questions/repository"
 	"github.com/go-chi/chi"
 	log "github.com/sirupsen/logrus"
 	"github.com/volatiletech/null/v8"
-	"github.com/volatiletech/sqlboiler/v4/boil"
-	"github.com/volatiletech/sqlboiler/v4/queries/qm"
 )
 
-type Request struct {
-	UpdateRequest
-	QuestionID string `json:"question_id"`
+type AnswerController struct {
+	answerRepository   repository.AnswerRepository
+	questionRepository questionRepository.QuestionRepository
 }
 
-type UpdateRequest struct {
-	Answer string `json:"answer"`
+func NewController(answerRepository repository.AnswerRepository,
+	questionRepository questionRepository.QuestionRepository) AnswerController {
+	return AnswerController{
+		answerRepository:   answerRepository,
+		questionRepository: questionRepository,
+	}
 }
 
-func Create(w http.ResponseWriter, r *http.Request) {
+func (ac AnswerController) Create(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	loggedInUser := r.Context().Value("user").(models.User)
 
@@ -36,7 +39,7 @@ func Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	savedAnswer, err := Insert(ctx, models.Answer{
+	savedAnswer, err := ac.answerRepository.Insert(ctx, models.Answer{
 		Answer:     req.Answer,
 		QuestionID: req.QuestionID,
 		CreatedBy:  loggedInUser.ID,
@@ -52,7 +55,7 @@ func Create(w http.ResponseWriter, r *http.Request) {
 	api.SuccessResponse(w, savedAnswer)
 }
 
-func Update(w http.ResponseWriter, r *http.Request) {
+func (ac AnswerController) Update(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	loggedInUser := r.Context().Value("user").(models.User)
 	id := chi.URLParam(r, "id")
@@ -65,7 +68,7 @@ func Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	answer, err := FindMyAnswer(ctx, loggedInUser.ID, id)
+	answer, err := ac.answerRepository.FindMyAnswer(ctx, loggedInUser.ID, id)
 	if err != nil && errors.Is(err, sql.ErrNoRows) {
 		api.BadRequest(w)
 
@@ -78,7 +81,7 @@ func Update(w http.ResponseWriter, r *http.Request) {
 	}
 
 	answer.Answer = req.Answer
-	if _, err := answer.Update(ctx, db.Get(), boil.Infer()); err != nil {
+	if _, err := ac.answerRepository.Update(ctx, *answer); err != nil {
 		log.Error(err)
 		api.InternalServerError(w)
 
@@ -88,11 +91,11 @@ func Update(w http.ResponseWriter, r *http.Request) {
 	api.SuccessResponse(w, answer)
 }
 
-func GetMyAnswers(w http.ResponseWriter, r *http.Request) {
+func (ac AnswerController) GetMyAnswers(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	loggedInUser := r.Context().Value("user").(models.User)
 
-	answers, err := FindAnswersCreatedBy(ctx, loggedInUser.ID)
+	answers, err := ac.answerRepository.FindAnswersCreatedBy(ctx, loggedInUser.ID)
 	if err != nil {
 		log.Error(err)
 		api.InternalServerError(w)
@@ -103,11 +106,11 @@ func GetMyAnswers(w http.ResponseWriter, r *http.Request) {
 	api.SuccessResponse(w, answers)
 }
 
-func GetQuestionsAnswers(w http.ResponseWriter, r *http.Request) {
+func (ac AnswerController) GetQuestionsAnswers(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	questionID := chi.URLParam(r, "questionID")
 
-	answers, err := FindAnswersQuestionID(ctx, questionID)
+	answers, err := ac.answerRepository.FindAnswersQuestionID(ctx, questionID)
 	if err != nil {
 		log.Error(err)
 		api.InternalServerError(w)
@@ -118,29 +121,26 @@ func GetQuestionsAnswers(w http.ResponseWriter, r *http.Request) {
 	api.SuccessResponse(w, answers)
 }
 
-func SetAnswered(w http.ResponseWriter, r *http.Request) {
+func (ac AnswerController) SetAnswered(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	loggedInUser := r.Context().Value("user").(models.User)
 	questionID := chi.URLParam(r, "questionID")
 	answerID := chi.URLParam(r, "answerID")
 
-	questionExist, err := models.Questions(
-		qm.Where("id=?", questionID),
-		qm.And("created_by=?", loggedInUser.ID)).Exists(ctx, db.Get())
-	if err != nil {
+	_, err := ac.questionRepository.GetCurrentUsers(ctx, questionID, loggedInUser.ID)
+	if err != nil && errors.Is(err, sql.ErrNoRows) {
+		log.Warnf("User [%s] cannot set question [%s] answered with answer [%s]", loggedInUser.ID, questionID, answerID)
+		api.BadRequest(w)
+
+		return
+	} else if err != nil {
 		log.Error(err)
 		api.InternalServerError(w)
 
 		return
 	}
-	if !questionExist {
-		log.Warnf("User [%s] cannot set question [%s] answered with answer [%s]", loggedInUser.ID, questionID, answerID)
-		api.BadRequest(w)
 
-		return
-	}
-
-	answer, err := models.Answers(qm.Where("id=?", answerID), qm.And("question_id=?", questionID)).One(ctx, db.Get())
+	a, err := ac.answerRepository.SetAnswered(ctx, answerID, questionID)
 	if err != nil && errors.Is(err, sql.ErrNoRows) {
 		api.BadRequest(w)
 
@@ -152,13 +152,5 @@ func SetAnswered(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	answer.Answered.SetValid(true)
-	if _, err := answer.Update(ctx, db.Get(), boil.Infer()); err != nil {
-		log.Error(err)
-		api.InternalServerError(w)
-
-		return
-	}
-
-	api.SuccessResponse(w, answer)
+	api.SuccessResponse(w, a)
 }

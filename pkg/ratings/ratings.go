@@ -1,27 +1,30 @@
 package ratings
 
 import (
-	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"net/http"
 
 	"github.com/borosr/qa-site/pkg/api"
 	"github.com/borosr/qa-site/pkg/db"
 	"github.com/borosr/qa-site/pkg/models"
-	"github.com/friendsofgo/errors"
+	"github.com/borosr/qa-site/pkg/ratings/repository"
 	"github.com/go-chi/chi"
 	log "github.com/sirupsen/logrus"
-	"github.com/volatiletech/sqlboiler/v4/queries/qm"
 )
 
-const (
-	defaultUnrateValue = iota - 1
-	_
-	defaultRateValue
-)
+type RateController struct {
+	rateRepository repository.RateRepository
+}
 
-func Rate(w http.ResponseWriter, r *http.Request) {
+func NewController(rateRepository repository.RateRepository) RateController {
+	return RateController{
+		rateRepository: rateRepository,
+	}
+}
+
+func (rc RateController) Rate(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	loggedInUser := r.Context().Value("user").(models.User)
 	id := chi.URLParam(r, "id")
@@ -33,7 +36,7 @@ func Rate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if isOwner(ctx, k, loggedInUser.ID, id) {
+	if rc.rateRepository.IsOwner(ctx, k, loggedInUser.ID, id) {
 		log.Errorf("owner [%s] of the record [%s]:[%s] trying to rate", loggedInUser.ID, k, id)
 		api.BadRequest(w)
 
@@ -41,7 +44,7 @@ func Rate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	log.Infof("Rating %s with id [%s]", k, id)
-	result, err := Rating(ctx, k, loggedInUser.ID, id)
+	result, err := rc.rateRepository.Rating(ctx, k, loggedInUser.ID, id)
 	if err != nil {
 		log.Error(err)
 		api.InternalServerError(w)
@@ -52,7 +55,7 @@ func Rate(w http.ResponseWriter, r *http.Request) {
 	api.SuccessResponse(w, Response{Value: result})
 }
 
-func Unrate(w http.ResponseWriter, r *http.Request) {
+func (rc RateController) Unrate(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	loggedInUser := r.Context().Value("user").(models.User)
 	id := chi.URLParam(r, "id")
@@ -64,7 +67,7 @@ func Unrate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if isOwner(ctx, k, loggedInUser.ID, id) {
+	if rc.rateRepository.IsOwner(ctx, k, loggedInUser.ID, id) {
 		log.Errorf("owner [%s] of the record [%s]:[%s] trying to rate", loggedInUser.ID, k, id)
 		api.BadRequest(w)
 
@@ -72,7 +75,7 @@ func Unrate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	log.Infof("Unrating %s with id [%s]", k, id)
-	result, err := Unrating(ctx, k, loggedInUser.ID, id)
+	result, err := rc.rateRepository.Unrating(ctx, k, loggedInUser.ID, id)
 	if err != nil {
 		log.Error(err)
 		api.InternalServerError(w)
@@ -83,7 +86,7 @@ func Unrate(w http.ResponseWriter, r *http.Request) {
 	api.SuccessResponse(w, Response{Value: result})
 }
 
-func Dismiss(w http.ResponseWriter, r *http.Request) {
+func (rc RateController) Dismiss(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	loggedInUser := r.Context().Value("user").(models.User)
 	id := chi.URLParam(r, "id")
@@ -95,14 +98,14 @@ func Dismiss(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if isOwner(ctx, k, loggedInUser.ID, id) {
+	if rc.rateRepository.IsOwner(ctx, k, loggedInUser.ID, id) {
 		log.Errorf("owner [%s] of the record [%s]:[%s] trying to rate", loggedInUser.ID, k, id)
 		api.BadRequest(w)
 
 		return
 	}
 
-	rating, err := models.Ratings(buildRateFilter(k, loggedInUser.ID, id)...).One(ctx, db.Get())
+	rating, err := models.Ratings(rc.rateRepository.BuildRateFilter(k, loggedInUser.ID, id)...).One(ctx, db.Get())
 	if err != nil && errors.Is(err, sql.ErrNoRows) {
 		log.Errorf("rating not found for user [%s] and [%s][%s]", loggedInUser.ID, k, id)
 		api.BadRequest(w)
@@ -129,7 +132,7 @@ func Dismiss(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	result, err := getCurrentValue(ctx, k, loggedInUser.ID, id)
+	result, err := rc.rateRepository.GetCurrentValue(ctx, k, loggedInUser.ID, id)
 	if err != nil {
 		log.Error(err)
 		api.InternalServerError(w)
@@ -140,30 +143,12 @@ func Dismiss(w http.ResponseWriter, r *http.Request) {
 	api.SuccessResponse(w, Response{Value: result})
 }
 
-func isOwner(ctx context.Context, k kind, userID, id string) bool {
-	var err error
-	var exists bool
-	switch k {
-	case QuestionKind:
-		exists, err = models.Questions(qm.Where("id=?", id), qm.And("created_by=?", userID)).Exists(ctx, db.Get())
-	case AnswerKind:
-		exists, err = models.Answers(qm.Where("id=?", id), qm.And("created_by=?", userID)).Exists(ctx, db.Get())
-	}
-	if err != nil {
-		log.Error(err)
-
-		return true // to prevent rating
-	}
-
-	return exists
-}
-
-func getKind(k string) (kind, error) {
+func getKind(k string) (repository.Kind, error) {
 	switch k {
 	case "questions":
-		return QuestionKind, nil
+		return repository.QuestionKind, nil
 	case "answers":
-		return AnswerKind, nil
+		return repository.AnswerKind, nil
 	}
 
 	return "", fmt.Errorf("invalid kind: [%s]", k)

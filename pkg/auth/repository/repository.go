@@ -1,7 +1,8 @@
-package auth
+package repository
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -16,18 +17,31 @@ import (
 	"github.com/volatiletech/sqlboiler/v4/queries/qm"
 )
 
-func StoreRevokeToken(ctx context.Context, ownerID, revokeToken string) error {
+type AuthRepository struct {
+	bdb *badger.DB
+	db  *sql.DB
+}
+
+func NewRepository(bdb *badger.DB,
+	db *sql.DB) AuthRepository {
+	return AuthRepository{
+		bdb: bdb,
+		db:  db,
+	}
+}
+
+func (ar AuthRepository) StoreRevokeToken(ctx context.Context, ownerID, revokeToken string) error {
 	token := models.RevokeToken{
 		ID:      xid.New().String(),
 		OwnerID: ownerID,
 		Token:   revokeToken,
 	}
 
-	return token.Insert(ctx, db.Get(), boil.Infer())
+	return token.Insert(ctx, ar.db, boil.Infer())
 }
 
-func GetRevokeToken(ctx context.Context, ownerID string) string {
-	token, err := models.RevokeTokens(qm.Where("owner_id=?", ownerID)).One(ctx, db.Get())
+func (ar AuthRepository) GetRevokeToken(ctx context.Context, ownerID string) string {
+	token, err := models.RevokeTokens(qm.Where("owner_id=?", ownerID)).One(ctx, ar.db)
 	if err != nil {
 		logrus.Error(err)
 
@@ -37,8 +51,8 @@ func GetRevokeToken(ctx context.Context, ownerID string) string {
 	return token.Token
 }
 
-func StoreJwtToken(ownerID, token string, expr time.Time) error {
-	return db.GetBDB().Update(func(txn *badger.Txn) error {
+func (ar AuthRepository) StoreJwtToken(ownerID, token string, expr time.Time) error {
+	return ar.bdb.Update(func(txn *badger.Txn) error {
 		item, err := txn.Get([]byte(ownerID))
 		if err != nil && errors.Is(err, badger.ErrKeyNotFound) {
 			value, _ := json.Marshal([]TokenCache{{Token: token, Expr: expr}})
@@ -61,8 +75,8 @@ func StoreJwtToken(ownerID, token string, expr time.Time) error {
 	})
 }
 
-func DeleteJwtToken(ownerID, token string) error {
-	return db.GetBDB().Update(func(txn *badger.Txn) error {
+func (ar AuthRepository) DeleteJwtToken(ownerID, token string) error {
+	return ar.bdb.Update(func(txn *badger.Txn) error {
 		item, err := txn.Get([]byte(ownerID))
 		if err != nil {
 			return err
@@ -98,8 +112,8 @@ func DeleteJwtToken(ownerID, token string) error {
 	})
 }
 
-func ExistsAndNotExpired(ownerID, token string, now time.Time) error {
-	return db.GetBDB().View(func(txn *badger.Txn) error {
+func (ar AuthRepository) ExistsAndNotExpired(ownerID, token string, now time.Time) error {
+	return ar.bdb.View(func(txn *badger.Txn) error {
 		item, err := txn.Get([]byte(ownerID))
 		if err != nil {
 			return err
@@ -120,4 +134,16 @@ func ExistsAndNotExpired(ownerID, token string, now time.Time) error {
 			return fmt.Errorf("token [%s] is not found or expired", token)
 		})
 	})
+}
+
+func (ar AuthRepository) FindRevokeTokenBy(ctx context.Context, userID, token string) (*models.RevokeToken, error) {
+	return models.RevokeTokens(
+		qm.Where("owner_id=?", userID),
+		qm.And("token=?", token),
+	).One(ctx, ar.db)
+}
+
+func (ar AuthRepository) Update(ctx context.Context, token *models.RevokeToken) (*models.RevokeToken, error) {
+	_, err := token.Update(ctx, db.Get(), boil.Infer())
+	return token, err
 }

@@ -3,8 +3,8 @@ package main
 import (
 	"time"
 
+	"github.com/borosr/qa-site/internal/api"
 	"github.com/borosr/qa-site/pkg/db"
-	"github.com/borosr/qa-site/src/api"
 	log "github.com/sirupsen/logrus"
 )
 

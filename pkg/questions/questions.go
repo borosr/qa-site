@@ -6,30 +6,31 @@ import (
 	"strconv"
 
 	"github.com/borosr/qa-site/pkg/api"
-	"github.com/borosr/qa-site/pkg/db"
 	"github.com/borosr/qa-site/pkg/models"
+	"github.com/borosr/qa-site/pkg/questions/repository"
 	"github.com/friendsofgo/errors"
 	"github.com/go-chi/chi"
 	log "github.com/sirupsen/logrus"
 	"github.com/volatiletech/null/v8"
-	"github.com/volatiletech/sqlboiler/v4/boil"
-	"github.com/volatiletech/sqlboiler/v4/queries/qm"
 )
 
 const (
-	StatusPublished = "Published"
-	StatusArchived  = "Archived"
-	StatusDeleted   = "Deleted"
-
 	DefaultOffset = 0
 	DefaultLimit  = 10
 	DefaultSort = "created_at"
-
-	getAllSelect = "id, title, description, created_by, created_at, status"
-	ratingSum    = "(SELECT COALESCE(SUM(value),0) as rating FROM ratings WHERE record_id=questions.id AND kind='question')"
 )
 
-func Create(w http.ResponseWriter, r *http.Request) {
+type QuestionController struct {
+	questionRepository repository.QuestionRepository
+}
+
+func NewController(questionRepository repository.QuestionRepository) QuestionController {
+	return QuestionController{
+		questionRepository: questionRepository,
+	}
+}
+
+func (qc QuestionController) Create(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	loggedInUser := r.Context().Value("user").(models.User)
 
@@ -43,11 +44,11 @@ func Create(w http.ResponseWriter, r *http.Request) {
 
 	var err error
 	var question models.Question
-	if question, err = Insert(ctx, models.Question{
+	if question, err = qc.questionRepository.Insert(ctx, models.Question{
 		Title:       req.Title,
 		Description: req.Description,
 		CreatedBy:   loggedInUser.ID,
-		Status:      null.StringFrom(StatusPublished),
+		Status:      null.StringFrom(repository.StatusPublished),
 	}); err != nil {
 		log.Error(err)
 		api.InternalServerError(w)
@@ -58,7 +59,7 @@ func Create(w http.ResponseWriter, r *http.Request) {
 	api.SuccessResponse(w, question)
 }
 
-func Update(w http.ResponseWriter, r *http.Request) {
+func (qc QuestionController) Update(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	loggedInUser := r.Context().Value("user").(models.User)
 	id := chi.URLParam(r, "id")
@@ -71,10 +72,7 @@ func Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	question, err := models.Questions(
-		qm.Where("id=?", id),
-		qm.And("created_by=?", loggedInUser.ID),
-		qm.And("status!=?", StatusDeleted)).One(ctx, db.Get())
+	question, err := qc.questionRepository.GetCurrentUsers(ctx, id, loggedInUser.ID)
 	if err != nil && errors.Is(err, sql.ErrNoRows) {
 		api.NotFound(w)
 
@@ -89,7 +87,7 @@ func Update(w http.ResponseWriter, r *http.Request) {
 	question.Title = req.Title
 	question.Description = req.Description
 
-	if _, err := question.Update(ctx, db.Get(), boil.Infer()); err != nil {
+	if _, err := qc.questionRepository.Update(ctx, question); err != nil {
 		log.Error(err)
 		api.InternalServerError(w)
 
@@ -99,7 +97,7 @@ func Update(w http.ResponseWriter, r *http.Request) {
 	api.SuccessResponse(w, question)
 }
 
-func GetAll(w http.ResponseWriter, r *http.Request) {
+func (qc QuestionController) GetAll(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
 	limit, err := getLimit(r)
@@ -117,22 +115,8 @@ func GetAll(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var resp []Response
-	if err := models.Questions(
-		append(buildQuestionsRatingQuery(),
-			qm.OrderBy(getSort(r)),
-			qm.Limit(limit),
-			qm.Offset(offset))...).
-		Bind(ctx, db.Get(), &resp);
-		err != nil {
-		log.Error(err)
-		api.InternalServerError(w)
-
-		return
-	}
-
-	var count int64
-	if count, err = models.Questions(buildQuestionsRatingQuery()...).Count(ctx, db.Get()); err != nil {
+	questions, count, err := qc.questionRepository.GetAll(ctx, getSort(r), limit, offset)
+	if err != nil {
 		log.Error(err)
 		api.InternalServerError(w)
 
@@ -140,7 +124,7 @@ func GetAll(w http.ResponseWriter, r *http.Request) {
 	}
 
 	api.SuccessResponse(w, PageableResponse{
-		Data:  resp,
+		Data:  questions,
 		Count: count,
 	})
 }
@@ -153,39 +137,12 @@ func getSort(r *http.Request) string {
 	return DefaultSort
 }
 
-func Get(w http.ResponseWriter, r *http.Request) {
+func (qc QuestionController) Get(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	id := chi.URLParam(r, "id")
 
-	var resp Response
-	if err := models.Questions(
-		append(
-			buildQuestionsRatingQuery(),
-			qm.And("id=?", id))...).
-		Bind(ctx, db.Get(), &resp);
-		err != nil && errors.Is(err, sql.ErrNoRows) {
-		api.NotFound(w)
+	q, err := qc.questionRepository.Get(ctx, id)
 
-		return
-	} else if err != nil {
-		log.Error(err)
-		api.InternalServerError(w)
-
-		return
-	}
-
-	api.SuccessResponse(w, resp)
-}
-
-func Delete(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
-	id := chi.URLParam(r, "id")
-	loggedInUser := r.Context().Value("user").(models.User)
-
-	question, err := models.Questions(
-		qm.Where("id=?", id),
-		qm.And("created_by=?", loggedInUser.ID),
-		qm.And("status!=?", StatusDeleted)).One(ctx, db.Get())
 	if err != nil && errors.Is(err, sql.ErrNoRows) {
 		api.NotFound(w)
 
@@ -197,9 +154,20 @@ func Delete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	question.Status.SetValid(StatusDeleted)
+	api.SuccessResponse(w, q)
+}
 
-	if _, err := question.Update(ctx, db.Get(), boil.Infer()); err != nil {
+func (qc QuestionController) Delete(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	id := chi.URLParam(r, "id")
+	loggedInUser := r.Context().Value("user").(models.User)
+
+	err := qc.questionRepository.Delete(ctx, id, loggedInUser.ID)
+	if err != nil && errors.Is(err, sql.ErrNoRows) {
+		api.NotFound(w)
+
+		return
+	} else if err != nil {
 		log.Error(err)
 		api.InternalServerError(w)
 
@@ -233,11 +201,4 @@ func getOffset(r *http.Request) (int, error) {
 	}
 
 	return limit, err
-}
-
-func buildQuestionsRatingQuery() []qm.QueryMod {
-	return []qm.QueryMod{
-		qm.Select(getAllSelect, ratingSum),
-		qm.Where("status=?", StatusPublished),
-	}
 }
