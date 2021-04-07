@@ -6,7 +6,15 @@ import (
 	"github.com/borosr/qa-site/pkg/api"
 )
 
-func Route(w http.ResponseWriter, r *http.Request) {
+type Controller struct {
+
+}
+
+func NewController() Controller {
+	return Controller{}
+}
+
+func (c Controller) Route(w http.ResponseWriter, r *http.Request) {
 	// TODO check the state in the future
 	api.SuccessResponse(w, struct{ Status string }{Status: "ok"})
 }

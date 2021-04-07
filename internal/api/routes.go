@@ -40,11 +40,12 @@ func Init() error {
 	qc := questions.NewController(qr)
 	anc := answers.NewController(anr, qr)
 	rc := ratings.NewController(rr)
+	hcc := healthcheck.NewController()
 
 	r.Route("/api", func(r chi.Router) {
 		loggedIn := r.With(auc.Middleware)
 
-		r.Get("/status", healthcheck.Route)
+		r.Get("/status", hcc.Route)
 
 		initAuth(r, auc, loggedIn)
 		initUsers(r, uc, loggedIn)

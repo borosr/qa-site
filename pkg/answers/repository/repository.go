@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"time"
 
-	"github.com/borosr/qa-site/pkg/answers"
 	"github.com/borosr/qa-site/pkg/db"
 	"github.com/borosr/qa-site/pkg/models"
 	"github.com/rs/xid"
@@ -41,8 +40,8 @@ func (ar AnswerRepository) Update(ctx context.Context, a models.Answer) (models.
 	return a, err
 }
 
-func (ar AnswerRepository) FindAnswersCreatedBy(ctx context.Context, ownerID string) ([]answers.Response, error) {
-	var resp []answers.Response
+func (ar AnswerRepository) FindAnswersCreatedBy(ctx context.Context, ownerID string) ([]AnswerWithRating, error) {
+	var resp []AnswerWithRating
 	if err := models.Answers(
 		qm.Select(getAllSelect, ratingSum),
 		qm.Where("created_by=?", ownerID),
@@ -58,8 +57,8 @@ func (ar AnswerRepository) FindMyAnswer(ctx context.Context, ownerID, id string)
 	return models.Answers(qm.Where("id=?", id), qm.And("created_by=?", ownerID)).One(ctx, ar.db)
 }
 
-func (ar AnswerRepository) FindAnswersQuestionID(ctx context.Context, questionID string) ([]answers.Response, error) {
-	var resp []answers.Response
+func (ar AnswerRepository) FindAnswersQuestionID(ctx context.Context, questionID string) ([]AnswerWithRating, error) {
+	var resp []AnswerWithRating
 	if err := models.Answers(
 		qm.Select(getAllSelect, ratingSum),
 		qm.Where("question_id=?", questionID),
@@ -84,3 +83,4 @@ func (ar AnswerRepository) SetAnswered(ctx context.Context, ID, questionID strin
 
 	return *answer, nil
 }
+
