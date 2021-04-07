@@ -11,3 +11,12 @@ type Response struct {
 	Answered   null.Bool `boil:"answered" json:"answered,omitempty"`
 	Rating     int       `boil:"rating" json:"rating"`
 }
+
+type Request struct {
+	UpdateRequest
+	QuestionID string `json:"question_id"`
+}
+
+type UpdateRequest struct {
+	Answer string `json:"answer"`
+}

@@ -4,16 +4,17 @@ import (
 	"net/http"
 
 	"github.com/borosr/qa-site/pkg/answers"
+	answerRepository "github.com/borosr/qa-site/pkg/answers/repository"
 	"github.com/borosr/qa-site/pkg/auth"
 	authRepository "github.com/borosr/qa-site/pkg/auth/repository"
 	"github.com/borosr/qa-site/pkg/db"
 	"github.com/borosr/qa-site/pkg/healthcheck"
 	"github.com/borosr/qa-site/pkg/questions"
+	questionRepository "github.com/borosr/qa-site/pkg/questions/repository"
 	"github.com/borosr/qa-site/pkg/ratings"
 	"github.com/borosr/qa-site/pkg/settings"
 	"github.com/borosr/qa-site/pkg/users"
 	userRepository "github.com/borosr/qa-site/pkg/users/repository"
-	questionRepository "github.com/borosr/qa-site/pkg/questions/repository"
 	"github.com/chi-middleware/logrus-logger"
 	"github.com/go-chi/chi"
 	"github.com/go-chi/chi/middleware"
@@ -28,18 +29,20 @@ func Init() error {
 	r.Use(middleware.Recoverer)
 
 	ur := userRepository.NewRepository(db.Get())
-	ar := authRepository.NewRepository(db.GetBDB(), db.Get())
+	aur := authRepository.NewRepository(db.GetBDB(), db.Get())
 	qr := questionRepository.NewRepository(db.Get())
+	anr := answerRepository.NewRepository(db.Get())
 	uc := users.NewController(ur)
-	ac := auth.NewController(ur, ar)
+	auc := auth.NewController(ur, aur)
 	qc := questions.NewController(qr)
+	anc := answers.NewController(anr, qr)
 
 	r.Route("/api", func(r chi.Router) {
-		loggedIn := r.With(ac.Middleware)
+		loggedIn := r.With(auc.Middleware)
 
 		r.Get("/status", healthcheck.Route)
 
-		initAuth(r, ac, loggedIn)
+		initAuth(r, auc, loggedIn)
 		initUsers(r, uc, loggedIn)
 
 		loggedIn.Get("/questions", qc.GetAll)
@@ -48,12 +51,12 @@ func Init() error {
 		loggedIn.Post("/questions", qc.Create)
 		loggedIn.Put("/questions/{id}", qc.Update)
 
-		loggedIn.Get("/questions/{questionID}/answers", answers.GetQuestionsAnswers)
-		loggedIn.Put("/questions/{questionID}/answers/{answerID}/answered", answers.SetAnswered)
+		loggedIn.Get("/questions/{questionID}/answers", anc.GetQuestionsAnswers)
+		loggedIn.Put("/questions/{questionID}/answers/{answerID}/answered", anc.SetAnswered)
 
-		loggedIn.Get("/answers", answers.GetMyAnswers)
-		loggedIn.Post("/answers", answers.Create)
-		loggedIn.Put("/answers/{id}", answers.Update)
+		loggedIn.Get("/answers", anc.GetMyAnswers)
+		loggedIn.Post("/answers", anc.Create)
+		loggedIn.Put("/answers/{id}", anc.Update)
 
 		loggedIn.Put("/{kind:(answers|questions)}/{id}/rate", ratings.Rate)
 		loggedIn.Put("/{kind:(answers|questions)}/{id}/unrate", ratings.Unrate)
