@@ -3,7 +3,9 @@ package repository
 import (
 	"context"
 	"database/sql"
+	"errors"
 
+	"github.com/borosr/qa-site/pkg/healthcheck"
 	"github.com/borosr/qa-site/pkg/models"
 	"github.com/rs/xid"
 	"github.com/volatiletech/sqlboiler/v4/boil"
@@ -29,6 +31,9 @@ func (ur UserRepository) Insert(ctx context.Context, u models.User) error {
 func (ur UserRepository) FindByUsername(ctx context.Context, username string) (models.User, error) {
 	user, err := models.Users(qm.Where("username=?", username)).One(ctx, ur.db)
 	if err != nil {
+		if !errors.Is(err, sql.ErrNoRows) {
+			healthcheck.Get().Failed()
+		}
 		return models.User{}, err
 	}
 
