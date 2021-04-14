@@ -3,7 +3,9 @@ package repository
 import (
 	"context"
 	"database/sql"
+	"errors"
 
+	"github.com/borosr/qa-site/pkg/healthcheck"
 	"github.com/borosr/qa-site/pkg/models"
 	"github.com/rs/xid"
 	"github.com/volatiletech/sqlboiler/v4/boil"
@@ -29,6 +31,9 @@ func (ur UserRepository) Insert(ctx context.Context, u models.User) error {
 func (ur UserRepository) FindByUsername(ctx context.Context, username string) (models.User, error) {
 	user, err := models.Users(qm.Where("username=?", username)).One(ctx, ur.db)
 	if err != nil {
+		if !errors.Is(err, sql.ErrNoRows) {
+			healthcheck.Get().Failed()
+		}
 		return models.User{}, err
 	}
 
@@ -36,11 +41,23 @@ func (ur UserRepository) FindByUsername(ctx context.Context, username string) (m
 }
 
 func (ur UserRepository) GetAll(ctx context.Context) (models.UserSlice, error) {
-	return models.Users(qm.Select("id, username, full_name")).All(ctx, ur.db)
+	user, err := models.Users(qm.Select("id, username, full_name")).All(ctx, ur.db)
+	if err != nil {
+		if !errors.Is(err, sql.ErrNoRows) {
+			healthcheck.Get().Failed()
+		}
+		return models.UserSlice{}, err
+	}
 }
 
 func (ur UserRepository) Get(ctx context.Context, id string) (*models.User, error) {
-	return models.FindUser(ctx, ur.db, id, "id", "username", "full_name")
+	user, err := models.FindUser(ctx, ur.db, id, "id", "username", "full_name")
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			healthcheck.Get().Failed()
+		}
+		return &models.User{}, err
+	}
 }
 
 func (ur UserRepository) Delete(ctx context.Context, m models.User) error {
@@ -55,5 +72,12 @@ func (ur UserRepository) Update(ctx context.Context, u models.User) (models.User
 
 func (ur UserRepository) ExistsByUsername(ctx context.Context, username string) bool {
 	exists, err := models.Users(qm.Where("username=?", username)).Exists(ctx, ur.db)
-	return err != nil || exists
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			healthcheck.Get().Failed()
+		}
+		return err
+	} else {
+		exists
+	}
 }

@@ -5,17 +5,21 @@ import (
 
 	"github.com/borosr/qa-site/internal/api"
 	"github.com/borosr/qa-site/pkg/db"
+	"github.com/borosr/qa-site/pkg/healthcheck"
 	log "github.com/sirupsen/logrus"
 )
 
 func main() {
 	initLog()
 
-	if err := db.Migrate(); err != nil {
-		log.Fatal(err)
+	if healthcheck.Get().Healthy() {
+		if err := db.Migrate(); err != nil {
+			healthcheck.Get().Failed()
+			log.Error(err)
+		}
 	}
 	if err := api.Init(); err != nil {
-		log.Fatal(err)
+		log.Error(err)
 	}
 }
 
