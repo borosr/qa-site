@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"github.com/borosr/qa-site/pkg/api"
+	"github.com/borosr/qa-site/pkg/settings"
 )
 
 const (
@@ -48,4 +49,8 @@ func (s *State) Healthy() bool {
 
 func (c Controller) Route(w http.ResponseWriter, r *http.Request) {
 	api.SuccessResponse(w, Get())
+}
+
+func (c Controller) Info(w http.ResponseWriter, r *http.Request) {
+	api.SuccessResponse(w, settings.Get().Visibility)
 }

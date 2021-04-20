@@ -47,6 +47,7 @@ type ResponseWrapper struct {
 type Provider interface {
 	Redirect(http.ResponseWriter, *http.Request)
 	Callback(http.ResponseWriter, *http.Request) (ResponseWrapper, error)
+	Available() bool
 }
 
 type UserDetails interface {
@@ -69,4 +70,12 @@ func Callback(w http.ResponseWriter, r *http.Request, provider string) (Response
 		return p.Callback(w, r)
 	}
 	return ResponseWrapper{}, fmt.Errorf("invalid provider type [%s]", provider)
+}
+
+func Availability() map[providerType]bool {
+	returnMap := make(map[providerType]bool)
+	for key, element := range providers {
+		returnMap[key] = element.Available()
+	}
+	return returnMap
 }

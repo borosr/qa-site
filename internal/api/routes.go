@@ -17,7 +17,7 @@ import (
 	"github.com/borosr/qa-site/pkg/settings"
 	"github.com/borosr/qa-site/pkg/users"
 	userRepository "github.com/borosr/qa-site/pkg/users/repository"
-	"github.com/chi-middleware/logrus-logger"
+	logger "github.com/chi-middleware/logrus-logger"
 	"github.com/go-chi/chi"
 	"github.com/go-chi/chi/middleware"
 	log "github.com/sirupsen/logrus"
@@ -57,6 +57,8 @@ func Init() error {
 		loggedIn := r.With(auc.Middleware)
 
 		r.Get("/status", hcc.Route)
+
+		r.Get("/info", hcc.Info)
 
 		initAuth(r, auc, loggedIn)
 		initUsers(r, uc, loggedIn)

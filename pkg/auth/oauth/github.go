@@ -71,6 +71,11 @@ func (g GithubOAuth) Redirect(w http.ResponseWriter, r *http.Request) {
 		http.StatusMovedPermanently)
 }
 
+func (g GithubOAuth) Available() bool {
+	config := settings.Get()
+	return !(config.GithubClientID == "" || config.GithubClientSecret == "")
+}
+
 func (g GithubOAuth) Callback(w http.ResponseWriter, r *http.Request) (ResponseWrapper, error) {
 	code := r.URL.Query().Get("code")
 

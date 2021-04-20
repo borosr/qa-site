@@ -15,10 +15,10 @@ type Config struct {
 	RevokeSecret       string `json:"revoke_secret"`
 	Hostname           string `json:"hostname"`
 	BadgerPath         string `json:"badger_path"`
-
 	GithubClientID     string `json:"github_client_id"`
 	GithubClientSecret string `json:"github_client_secret"`
 	set                bool   `json:"-"`
+	Visibility         string `json:"visibility"`
 }
 
 func Get() Config {
