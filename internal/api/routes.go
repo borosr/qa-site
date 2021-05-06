@@ -58,6 +58,8 @@ func Init() error {
 
 		r.Get("/status", hcc.Route)
 
+		r.Get("/info", hhc.Info)
+
 		initAuth(r, auc, loggedIn)
 		initUsers(r, uc, loggedIn)
 		initQuestions(loggedIn, qc)

@@ -48,6 +48,7 @@ func (ur UserRepository) GetAll(ctx context.Context) (models.UserSlice, error) {
 		}
 		return models.UserSlice{}, err
 	}
+	return user, nil
 }
 
 func (ur UserRepository) Get(ctx context.Context, id string) (*models.User, error) {
@@ -58,6 +59,7 @@ func (ur UserRepository) Get(ctx context.Context, id string) (*models.User, erro
 		}
 		return &models.User{}, err
 	}
+	return user, nil
 }
 
 func (ur UserRepository) Delete(ctx context.Context, m models.User) error {
@@ -76,8 +78,7 @@ func (ur UserRepository) ExistsByUsername(ctx context.Context, username string) 
 		if errors.Is(err, sql.ErrNoRows) {
 			healthcheck.Get().Failed()
 		}
-		return err
-	} else {
-		exists
+		return false
 	}
+	return exists
 }

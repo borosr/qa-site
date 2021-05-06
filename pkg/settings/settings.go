@@ -19,6 +19,7 @@ type Config struct {
 	GithubClientID     string `json:"github_client_id"`
 	GithubClientSecret string `json:"github_client_secret"`
 	set                bool   `json:"-"`
+	Visibility         string `json:"visibility"`
 }
 
 func Get() Config {
