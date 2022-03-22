@@ -3,8 +3,6 @@ package oauth
 import (
 	"fmt"
 	"net/http"
-
-	"github.com/borosr/qa-site/pkg/settings"
 )
 
 const (
@@ -12,17 +10,8 @@ const (
 )
 
 var (
-	config = settings.Get()
-
 	providers = map[providerType]Provider{
 		GithubProvider: &GithubOAuth{},
-	}
-
-	configs = map[providerType]Config{
-		GithubProvider: {
-			ClientID:     config.GithubClientID,
-			ClientSecret: config.GithubClientSecret,
-		},
 	}
 )
 
@@ -72,10 +61,10 @@ func Callback(w http.ResponseWriter, r *http.Request, provider string) (Response
 	return ResponseWrapper{}, fmt.Errorf("invalid provider type [%s]", provider)
 }
 
-func Availability() map[providerType]bool {
-	returnMap := make(map[providerType]bool)
+func Availability() map[string]bool {
+	returnMap := make(map[string]bool)
 	for key, element := range providers {
-		returnMap[key] = element.Available()
+		returnMap[string(key)] = element.Available()
 	}
 	return returnMap
 }

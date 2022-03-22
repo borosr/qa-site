@@ -12,9 +12,9 @@ import (
 func main() {
 	initLog()
 
-	if healthcheck.Get().Healthy() {
+	if healthcheck.Instance().Healthy() {
 		if err := db.Migrate(); err != nil {
-			healthcheck.Get().Failed()
+			healthcheck.Instance().Failed()
 			log.Error(err)
 		}
 	}
@@ -25,8 +25,8 @@ func main() {
 
 func initLog() {
 	log.SetFormatter(&log.TextFormatter{
-		FullTimestamp:             true,
-		TimestampFormat:           time.RFC3339,
-		QuoteEmptyFields:          true,
+		FullTimestamp:    true,
+		TimestampFormat:  time.RFC3339,
+		QuoteEmptyFields: true,
 	})
 }

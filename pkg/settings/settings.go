@@ -17,8 +17,8 @@ type Config struct {
 	BadgerPath         string `json:"badger_path"`
 	GithubClientID     string `json:"github_client_id"`
 	GithubClientSecret string `json:"github_client_secret"`
-	set                bool   `json:"-"`
 	Visibility         string `json:"visibility"`
+	set                bool   `json:"-"`
 }
 
 func Get() Config {

@@ -2,7 +2,6 @@ package api
 
 import (
 	"net/http"
-	"strings"
 
 	"github.com/borosr/qa-site/pkg/answers"
 	answerRepository "github.com/borosr/qa-site/pkg/answers/repository"
@@ -29,16 +28,7 @@ func Init() error {
 	r.Use(middleware.RealIP)
 	r.Use(logger.Logger("router", log.New()))
 	r.Use(middleware.Recoverer)
-	r.Use(func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			if !strings.HasSuffix(r.RequestURI, "/api/status") && !healthcheck.Get().Healthy() {
-				http.Error(w, "Internal Server Error", http.StatusInternalServerError)
-
-				return
-			}
-			next.ServeHTTP(w, r)
-		})
-	})
+	r.Use(healthcheck.Middleware)
 
 	ur := userRepository.NewRepository(db.Get())
 	aur := authRepository.NewRepository(db.GetBDB(), db.Get())
@@ -71,7 +61,7 @@ func Init() error {
 	config := settings.Get()
 	log.Infof("Running the API on port: %s", config.Port)
 
-	if hchk := healthcheck.Get(); hchk.Healthy() {
+	if hchk := healthcheck.Instance(); hchk.Healthy() {
 		hchk.Ok()
 	}
 

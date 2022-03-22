@@ -8,6 +8,7 @@ import (
 	"github.com/borosr/qa-site/pkg/healthcheck"
 	"github.com/borosr/qa-site/pkg/models"
 	"github.com/rs/xid"
+	log "github.com/sirupsen/logrus"
 	"github.com/volatiletech/sqlboiler/v4/boil"
 	"github.com/volatiletech/sqlboiler/v4/queries/qm"
 )
@@ -32,7 +33,7 @@ func (ur UserRepository) FindByUsername(ctx context.Context, username string) (m
 	user, err := models.Users(qm.Where("username=?", username)).One(ctx, ur.db)
 	if err != nil {
 		if !errors.Is(err, sql.ErrNoRows) {
-			healthcheck.Get().Failed()
+			healthcheck.Instance().Failed()
 		}
 		return models.User{}, err
 	}
@@ -41,23 +42,25 @@ func (ur UserRepository) FindByUsername(ctx context.Context, username string) (m
 }
 
 func (ur UserRepository) GetAll(ctx context.Context) (models.UserSlice, error) {
-	user, err := models.Users(qm.Select("id, username, full_name")).All(ctx, ur.db)
+	users, err := models.Users(qm.Select("id, username, full_name")).All(ctx, ur.db)
 	if err != nil {
 		if !errors.Is(err, sql.ErrNoRows) {
-			healthcheck.Get().Failed()
+			healthcheck.Instance().Failed()
 		}
 		return models.UserSlice{}, err
 	}
+	return users, nil
 }
 
 func (ur UserRepository) Get(ctx context.Context, id string) (*models.User, error) {
 	user, err := models.FindUser(ctx, ur.db, id, "id", "username", "full_name")
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			healthcheck.Get().Failed()
+			healthcheck.Instance().Failed()
 		}
 		return &models.User{}, err
 	}
+	return user, nil
 }
 
 func (ur UserRepository) Delete(ctx context.Context, m models.User) error {
@@ -73,11 +76,10 @@ func (ur UserRepository) Update(ctx context.Context, u models.User) (models.User
 func (ur UserRepository) ExistsByUsername(ctx context.Context, username string) bool {
 	exists, err := models.Users(qm.Where("username=?", username)).Exists(ctx, ur.db)
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			healthcheck.Get().Failed()
+		if !errors.Is(err, sql.ErrNoRows) {
+			log.Error(err, "error getting user by username")
+			return false
 		}
-		return err
-	} else {
-		exists
 	}
+	return exists
 }
