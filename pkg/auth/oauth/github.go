@@ -12,8 +12,7 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-type GithubOAuth struct {
-}
+type GithubOAuth struct{}
 
 type GithubUserData struct {
 	Login                   string    `json:"login"`
