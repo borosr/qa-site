@@ -4,6 +4,11 @@ import (
 	"github.com/spf13/viper"
 )
 
+const (
+	VisibilityPrivate = "private"
+	VisibilityPublic  = "public"
+)
+
 var config Config
 
 type Config struct {
@@ -51,4 +56,5 @@ func setDefaults() {
 	viper.SetDefault("GithubClientID", "")
 	viper.SetDefault("GithubClientSecret", "")
 	viper.SetDefault("BadgerPath", "/tmp/badger")
+	viper.SetDefault("Visibility", VisibilityPrivate)
 }

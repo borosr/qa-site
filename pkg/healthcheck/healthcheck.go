@@ -61,8 +61,8 @@ func (s *State) Healthy() bool {
 }
 
 type InfoResponse struct {
-	Visibility     string
-	OauthProviders map[string]bool
+	Visibility     string          `json:"visibility"`
+	OauthProviders map[string]bool `json:"oauth_providers"`
 }
 
 func (c Controller) Route(w http.ResponseWriter, r *http.Request) {
