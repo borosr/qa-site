@@ -6,5 +6,6 @@
   "RevokeHMAC": "d4e25dba5331071ed574cd337501ba934316cb4d475dc5f99407d3a0b97cdd42",
   "RevokeSecret": "otherRandomString",
   "Hostname": "localhost",
-  "BadgerPath": "/tmp/badger"
+  "BadgerPath": "/tmp/badger",
+  "Visibility": "public"
 }
