@@ -11,6 +11,7 @@ import (
 	"github.com/borosr/qa-site/pkg/models"
 	"github.com/borosr/qa-site/pkg/ratings/repository"
 	"github.com/go-chi/chi"
+	"github.com/samber/do"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -18,7 +19,8 @@ type RateController struct {
 	rateRepository repository.RateRepository
 }
 
-func NewController(rateRepository repository.RateRepository) RateController {
+func NewController(i *do.Injector) RateController {
+	rateRepository := do.MustInvoke[repository.RateRepository](i)
 	return RateController{
 		rateRepository: rateRepository,
 	}

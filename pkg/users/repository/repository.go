@@ -8,6 +8,7 @@ import (
 	"github.com/borosr/qa-site/pkg/healthcheck"
 	"github.com/borosr/qa-site/pkg/models"
 	"github.com/rs/xid"
+	"github.com/samber/do"
 	log "github.com/sirupsen/logrus"
 	"github.com/volatiletech/sqlboiler/v4/boil"
 	"github.com/volatiletech/sqlboiler/v4/queries/qm"
@@ -17,10 +18,14 @@ type UserRepository struct {
 	db *sql.DB
 }
 
-func NewRepository(db *sql.DB) UserRepository {
+func NewRepository(i *do.Injector) (UserRepository, error) {
+	db, err := do.Invoke[*sql.DB](i)
+	if err != nil {
+		return UserRepository{}, err
+	}
 	return UserRepository{
 		db: db,
-	}
+	}, nil
 }
 
 func (ur UserRepository) Insert(ctx context.Context, u models.User) error {

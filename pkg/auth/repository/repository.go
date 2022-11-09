@@ -8,10 +8,10 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/borosr/qa-site/pkg/db"
 	"github.com/borosr/qa-site/pkg/models"
 	"github.com/dgraph-io/badger/v2"
 	"github.com/rs/xid"
+	"github.com/samber/do"
 	"github.com/sirupsen/logrus"
 	"github.com/volatiletech/sqlboiler/v4/boil"
 	"github.com/volatiletech/sqlboiler/v4/queries/qm"
@@ -22,12 +22,19 @@ type AuthRepository struct {
 	db  *sql.DB
 }
 
-func NewRepository(bdb *badger.DB,
-	db *sql.DB) AuthRepository {
+func NewRepository(i *do.Injector) (AuthRepository, error) {
+	bdb, err := do.Invoke[*badger.DB](i)
+	if err != nil {
+		return AuthRepository{}, err
+	}
+	db, err := do.Invoke[*sql.DB](i)
+	if err != nil {
+		return AuthRepository{}, err
+	}
 	return AuthRepository{
 		bdb: bdb,
 		db:  db,
-	}
+	}, nil
 }
 
 func (ar AuthRepository) StoreRevokeToken(ctx context.Context, ownerID, revokeToken string) error {
@@ -144,6 +151,6 @@ func (ar AuthRepository) FindRevokeTokenBy(ctx context.Context, userID, token st
 }
 
 func (ar AuthRepository) Update(ctx context.Context, token *models.RevokeToken) (*models.RevokeToken, error) {
-	_, err := token.Update(ctx, db.Get(), boil.Infer())
+	_, err := token.Update(ctx, ar.db, boil.Infer())
 	return token, err
 }

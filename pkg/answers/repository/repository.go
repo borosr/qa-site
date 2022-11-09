@@ -5,9 +5,9 @@ import (
 	"database/sql"
 	"time"
 
-	"github.com/borosr/qa-site/pkg/db"
 	"github.com/borosr/qa-site/pkg/models"
 	"github.com/rs/xid"
+	"github.com/samber/do"
 	"github.com/volatiletech/sqlboiler/v4/boil"
 	"github.com/volatiletech/sqlboiler/v4/queries/qm"
 )
@@ -21,10 +21,14 @@ type AnswerRepository struct {
 	db *sql.DB
 }
 
-func NewRepository(db *sql.DB) AnswerRepository {
+func NewRepository(i *do.Injector) (AnswerRepository, error) {
+	db, err := do.Invoke[*sql.DB](i)
+	if err != nil {
+		return AnswerRepository{}, err
+	}
 	return AnswerRepository{
 		db: db,
-	}
+	}, nil
 }
 
 func (ar AnswerRepository) Insert(ctx context.Context, a models.Answer) (models.Answer, error) {
@@ -35,7 +39,7 @@ func (ar AnswerRepository) Insert(ctx context.Context, a models.Answer) (models.
 }
 
 func (ar AnswerRepository) Update(ctx context.Context, a models.Answer) (models.Answer, error) {
-	_, err := a.Update(ctx, db.Get(), boil.Infer())
+	_, err := a.Update(ctx, ar.db, boil.Infer())
 
 	return a, err
 }
@@ -45,8 +49,7 @@ func (ar AnswerRepository) FindAnswersCreatedBy(ctx context.Context, ownerID str
 	if err := models.Answers(
 		qm.Select(getAllSelect, ratingSum),
 		qm.Where("created_by=?", ownerID),
-	).Bind(ctx, ar.db, &resp);
-		err != nil {
+	).Bind(ctx, ar.db, &resp); err != nil {
 		return nil, err
 	}
 
@@ -62,8 +65,7 @@ func (ar AnswerRepository) FindAnswersQuestionID(ctx context.Context, questionID
 	if err := models.Answers(
 		qm.Select(getAllSelect, ratingSum),
 		qm.Where("question_id=?", questionID),
-	).Bind(ctx, ar.db, &resp);
-		err != nil {
+	).Bind(ctx, ar.db, &resp); err != nil {
 		return nil, err
 	}
 
@@ -83,4 +85,3 @@ func (ar AnswerRepository) SetAnswered(ctx context.Context, ID, questionID strin
 
 	return *answer, nil
 }
-

@@ -10,6 +10,7 @@ import (
 	"github.com/borosr/qa-site/pkg/models"
 	questionRepository "github.com/borosr/qa-site/pkg/questions/repository"
 	"github.com/go-chi/chi"
+	"github.com/samber/do"
 	log "github.com/sirupsen/logrus"
 	"github.com/volatiletech/null/v8"
 )
@@ -19,8 +20,9 @@ type AnswerController struct {
 	questionRepository questionRepository.QuestionRepository
 }
 
-func NewController(answerRepository repository.AnswerRepository,
-	questionRepository questionRepository.QuestionRepository) AnswerController {
+func NewController(i *do.Injector) AnswerController {
+	answerRepository := do.MustInvoke[repository.AnswerRepository](i)
+	questionRepository := do.MustInvoke[questionRepository.QuestionRepository](i)
 	return AnswerController{
 		answerRepository:   answerRepository,
 		questionRepository: questionRepository,

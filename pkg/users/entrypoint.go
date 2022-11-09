@@ -10,6 +10,7 @@ import (
 	"github.com/borosr/qa-site/pkg/models"
 	"github.com/borosr/qa-site/pkg/users/repository"
 	"github.com/go-chi/chi"
+	"github.com/samber/do"
 	log "github.com/sirupsen/logrus"
 	"github.com/volatiletech/null/v8"
 	"golang.org/x/crypto/bcrypt"
@@ -19,7 +20,8 @@ type UserController struct {
 	userRepository repository.UserRepository
 }
 
-func NewController(userRepository repository.UserRepository) UserController {
+func NewController(i *do.Injector) UserController {
+	userRepository := do.MustInvoke[repository.UserRepository](i)
 	return UserController{userRepository: userRepository}
 }
 

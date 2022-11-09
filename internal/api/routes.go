@@ -1,6 +1,7 @@
 package api
 
 import (
+	"database/sql"
 	"net/http"
 
 	"github.com/borosr/qa-site/pkg/answers"
@@ -17,8 +18,10 @@ import (
 	"github.com/borosr/qa-site/pkg/users"
 	userRepository "github.com/borosr/qa-site/pkg/users/repository"
 	logger "github.com/chi-middleware/logrus-logger"
+	"github.com/dgraph-io/badger/v2"
 	"github.com/go-chi/chi"
 	"github.com/go-chi/chi/middleware"
+	"github.com/samber/do"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -30,24 +33,19 @@ func Init() error {
 	r.Use(middleware.Recoverer)
 	r.Use(healthcheck.Middleware)
 
-	ur := userRepository.NewRepository(db.Get())
-	aur := authRepository.NewRepository(db.GetBDB(), db.Get())
-	qr := questionRepository.NewRepository(db.Get())
-	anr := answerRepository.NewRepository(db.Get())
-	rr := rateRepository.NewRepository(db.Get())
+	injector := initInjector()
 
-	uc := users.NewController(ur)
-	auc := auth.NewController(ur, aur)
-	qc := questions.NewController(qr)
-	anc := answers.NewController(anr, qr)
-	rc := ratings.NewController(rr)
-	hcc := healthcheck.NewController()
+	uc := users.NewController(injector)
+	auc := auth.NewController(injector)
+	qc := questions.NewController(injector)
+	anc := answers.NewController(injector)
+	rc := ratings.NewController(injector)
+	hcc := healthcheck.NewController(injector)
 
 	r.Route("/api", func(r chi.Router) {
 		loggedIn := r.With(auc.Middleware)
 
 		r.Get("/status", hcc.Route)
-
 		r.Get("/info", hcc.Info)
 
 		initAuth(r, loggedIn, auc)
@@ -55,7 +53,6 @@ func Init() error {
 		initQuestions(r, loggedIn, qc)
 		initAnswers(r, loggedIn, anc)
 		initRatings(loggedIn, rc)
-
 	})
 
 	config := settings.Get()
@@ -66,6 +63,19 @@ func Init() error {
 	}
 
 	return http.ListenAndServe(":"+config.Port, r)
+}
+
+func initInjector() *do.Injector {
+	injector := do.New()
+
+	do.ProvideValue[*sql.DB](injector, db.Get())
+	do.ProvideValue[*badger.DB](injector, db.GetBDB())
+	do.Provide[userRepository.UserRepository](injector, userRepository.NewRepository)
+	do.Provide[authRepository.AuthRepository](injector, authRepository.NewRepository)
+	do.Provide[questionRepository.QuestionRepository](injector, questionRepository.NewRepository)
+	do.Provide[answerRepository.AnswerRepository](injector, answerRepository.NewRepository)
+	do.Provide[rateRepository.RateRepository](injector, rateRepository.NewRepository)
+	return injector
 }
 
 func initRatings(loggedIn chi.Router, rc ratings.RateController) {

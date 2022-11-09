@@ -10,6 +10,7 @@ import (
 	"github.com/borosr/qa-site/pkg/questions/repository"
 	"github.com/friendsofgo/errors"
 	"github.com/go-chi/chi"
+	"github.com/samber/do"
 	log "github.com/sirupsen/logrus"
 	"github.com/volatiletech/null/v8"
 )
@@ -17,14 +18,15 @@ import (
 const (
 	DefaultOffset = 0
 	DefaultLimit  = 10
-	DefaultSort = "created_at"
+	DefaultSort   = "created_at"
 )
 
 type QuestionController struct {
 	questionRepository repository.QuestionRepository
 }
 
-func NewController(questionRepository repository.QuestionRepository) QuestionController {
+func NewController(i *do.Injector) QuestionController {
+	questionRepository := do.MustInvoke[repository.QuestionRepository](i)
 	return QuestionController{
 		questionRepository: questionRepository,
 	}

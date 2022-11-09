@@ -8,6 +8,7 @@ import (
 	"github.com/borosr/qa-site/pkg/api"
 	"github.com/borosr/qa-site/pkg/auth/oauth"
 	"github.com/borosr/qa-site/pkg/settings"
+	"github.com/samber/do"
 )
 
 const (
@@ -18,7 +19,7 @@ const (
 
 type Controller struct{}
 
-func NewController() Controller {
+func NewController(_ *do.Injector) Controller {
 	return Controller{}
 }
 

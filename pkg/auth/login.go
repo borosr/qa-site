@@ -18,6 +18,7 @@ import (
 	"github.com/dgrijalva/jwt-go"
 	"github.com/go-chi/chi"
 	"github.com/rs/xid"
+	"github.com/samber/do"
 	log "github.com/sirupsen/logrus"
 	"github.com/volatiletech/null/v8"
 	"golang.org/x/crypto/bcrypt"
@@ -39,8 +40,9 @@ type Controller struct {
 	authRepository authRepo.AuthRepository
 }
 
-func NewController(userRepository userRepo.UserRepository,
-	authRepository authRepo.AuthRepository) Controller {
+func NewController(i *do.Injector) Controller {
+	userRepository := do.MustInvoke[userRepo.UserRepository](i)
+	authRepository := do.MustInvoke[authRepo.AuthRepository](i)
 	return Controller{
 		userRepository: userRepository,
 		authRepository: authRepository,

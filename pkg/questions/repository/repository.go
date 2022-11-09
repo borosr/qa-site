@@ -7,6 +7,7 @@ import (
 
 	"github.com/borosr/qa-site/pkg/models"
 	"github.com/rs/xid"
+	"github.com/samber/do"
 	"github.com/volatiletech/sqlboiler/v4/boil"
 	"github.com/volatiletech/sqlboiler/v4/queries/qm"
 )
@@ -31,10 +32,14 @@ type QuestionRepository struct {
 	db *sql.DB
 }
 
-func NewRepository(db *sql.DB) QuestionRepository {
+func NewRepository(i *do.Injector) (QuestionRepository, error) {
+	db, err := do.Invoke[*sql.DB](i)
+	if err != nil {
+		return QuestionRepository{}, err
+	}
 	return QuestionRepository{
 		db: db,
-	}
+	}, nil
 }
 
 func (qr QuestionRepository) Insert(ctx context.Context, q models.Question) (models.Question, error) {
@@ -93,8 +98,7 @@ func (qr QuestionRepository) GetAll(ctx context.Context, sort string, limit, off
 			qm.OrderBy(sort),
 			qm.Limit(limit),
 			qm.Offset(offset))...).
-		Bind(ctx, qr.db, &resp);
-		err != nil {
+		Bind(ctx, qr.db, &resp); err != nil {
 		return nil, 0, err
 	}
 

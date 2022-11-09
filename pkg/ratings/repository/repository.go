@@ -8,6 +8,7 @@ import (
 	"github.com/borosr/qa-site/pkg/db"
 	"github.com/borosr/qa-site/pkg/models"
 	"github.com/rs/xid"
+	"github.com/samber/do"
 	log "github.com/sirupsen/logrus"
 	"github.com/volatiletech/sqlboiler/v4/boil"
 	"github.com/volatiletech/sqlboiler/v4/queries/qm"
@@ -26,15 +27,18 @@ const (
 
 type Kind string
 
-
 type RateRepository struct {
 	db *sql.DB
 }
 
-func NewRepository(db *sql.DB) RateRepository {
+func NewRepository(i *do.Injector) (RateRepository, error) {
+	db, err := do.Invoke[*sql.DB](i)
+	if err != nil {
+		return RateRepository{}, err
+	}
 	return RateRepository{
 		db: db,
-	}
+	}, nil
 }
 
 func (rr RateRepository) Exists(ctx context.Context, k Kind, userID, recordID string) (bool, error) {
